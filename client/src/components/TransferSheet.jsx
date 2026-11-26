@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, Banknote, PiggyBank, Lock } from 'lucide-react';
+import { ArrowDown, Lock } from 'lucide-react';
 import Sheet from './Sheet.jsx';
 import { AmountInput, Field, WalletPicker } from './ui.jsx';
 import { useApp } from '../store.jsx';
 import { api } from '../api.js';
-import { formatHUF, mainWallet, vaultSource } from '../lib/util.js';
+import { formatHUF, vaultSource } from '../lib/util.js';
 
 /** Átcsoportosítási panel gyors-forgatókönyvekkel. */
 export default function TransferSheet({ onClose, from, to, amount: initialAmount, note: initialNote }) {
@@ -16,27 +16,12 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
   const [busy, setBusy] = useState(false);
 
   const find = (kind) => state.wallets.filter((w) => w.kind === kind && !w.archived);
-  const otp = mainWallet(state.wallets);
-  const cash = find('cash')[0];
-  const envelopes = find('envelope');
   const vaults = find('vault');
   const revo = vaultSource(state.wallets);
   const fromWallet = state.wallets.find((w) => w.id === walletId);
 
   const scenarios = useMemo(() => {
     const list = [];
-    if (otp && cash) {
-      list.push({
-        icon: <Banknote size={18} />, label: 'Készpénz felvétel', sub: `${otp.name} → ${cash.name}`,
-        apply: () => { setWalletId(otp.id); setToWalletId(cash.id); setNote('ATM kp felvétel'); },
-      });
-    }
-    if (envelopes.length) {
-      list.push({
-        icon: <PiggyBank size={18} />, label: 'Félretétel borítékba', sub: envelopes.map((e) => e.name).join(', '),
-        apply: () => { setWalletId(otp?.id ?? null); setToWalletId(envelopes[0].id); setNote('Félretétel'); },
-      });
-    }
     if (vaults.length) {
       list.push({
         icon: <Lock size={18} />, label: 'Félretétel széfbe', sub: vaults.map((v) => v.name).join(', '),
@@ -44,7 +29,7 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
       });
     }
     return list;
-  }, [state, otp, cash, envelopes, vaults, revo]);
+  }, [vaults, revo]);
 
   const submit = async () => {
     setBusy(true);
@@ -58,6 +43,7 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
 
   return (
     <Sheet title="Pénz mozgatása" onClose={onClose} tall>
+      {scenarios.length > 0 && (
       <div className="scenarios">
         {scenarios.map((s) => (
           <button key={s.label} className="scenario" onClick={s.apply} disabled={s.disabled}>
@@ -66,6 +52,7 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
           </button>
         ))}
       </div>
+      )}
       <AmountInput value={amount} onChange={setAmount} tone="xfer" />
       <Field label="Honnan" hint={fromWallet ? `Elérhető: ${formatHUF(fromWallet.balance)}` : undefined}>
         <WalletPicker value={walletId} onChange={setWalletId} exclude={toWalletId} />
