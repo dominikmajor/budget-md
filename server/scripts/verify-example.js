@@ -312,9 +312,17 @@ try {
       assert.equal(vt[0].toWalletId, vaultId);
       assert.equal(et.some((t) => t.toWalletId === vaultId), false);
     });
-    await F.updateWallet(db, vaultId, { icon: '🏝️' });
+    await F.updateWallet(db, vaultId, { icon: '🏝️', color: '#1A2B3C' });
+    const catId = await F.createCategory(db, { name: 'Színteszt', kind: 'expense', icon: '🧪', color: '#abc' });
+    const cat = (await state()).categories.find((c) => c.id === catId);
     const iconNow = (await state()).wallets.find((w) => w.id === vaultId).icon;
     check('Széf ikonja átírható tetszőleges emojira (🏝️)', () => assert.equal(iconNow, '🏝️'));
+    const colorNow = (await state()).wallets.find((w) => w.id === vaultId).color;
+    check('Tetszőleges RGB szín tárcán és kategórián, hex alakra normalizálva', () => {
+      assert.equal(colorNow, '#1a2b3c');
+      assert.equal(cat.color, '#aabbcc');
+    });
+    await F.deleteCategory(db, catId);
     await db.query('SAVEPOINT v');
     try {
       await F.createWallet(db, { name: 'Rossz', kind: 'safe' });
@@ -322,6 +330,14 @@ try {
     } catch (e) {
       await db.query('ROLLBACK TO SAVEPOINT v');
       check('Érvénytelen tárcatípus elutasítva', () => assert.match(e.message, /tárcatípus/));
+    }
+    await db.query('SAVEPOINT c');
+    try {
+      await F.updateWallet(db, vaultId, { color: 'piros' });
+      failures++; console.log('  ❌ Érvénytelen szín elutasítva\n     nem dobott hibát');
+    } catch (e) {
+      await db.query('ROLLBACK TO SAVEPOINT c');
+      check('Érvénytelen szín elutasítva', () => assert.match(e.message, /hex/));
     }
   }
 

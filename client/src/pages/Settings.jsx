@@ -5,7 +5,7 @@ import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import Sheet from '../components/Sheet.jsx';
 import PinPad from '../components/PinPad.jsx';
-import { Card, Field, Segmented, CategoryPicker, EmojiInput, EMOJI_HINT } from '../components/ui.jsx';
+import { Card, Field, Segmented, CategoryPicker, IconColorPicker } from '../components/ui.jsx';
 import { downloadUrl } from '../lib/util.js';
 import { biometricLabel, biometricRegister, isCancel, platformAuthAvailable } from '../lib/biometric.js';
 
@@ -126,10 +126,7 @@ function CategoryEditor({ item, onClose, onDelete }) {
         <Field group label="Hová tartozik" hint="Válaszd a Főkategóriát, vagy bármelyik kategóriát (alkategóriát is), ami alá kerüljön">
           <CategoryPicker kind={item.kind} value={parentId} onChange={setParentId} exclude={exclude} noneLabel="⬆️ Főkategória" />
         </Field>
-        <Field label="Ikon (emoji)" hint={EMOJI_HINT}>
-          <EmojiInput value={icon} onChange={setIcon} label="Kategória ikonja (emoji)" />
-        </Field>
-        <Field label="Szín"><div className="color-grid">{COLORS.map((c) => <button type="button" key={c} className={color === c ? 'on' : ''} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />)}</div></Field>
+        <IconColorPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} label="Kategória ikonja" />
         <Field label="Gyorsbeviteli kulcsszavak" hint="Pl. „lidl, spar” – ezekre a szavakra automatikusan ez a kategória lesz kitöltve">
           <input className="input" value={keywords} onChange={(e) => setKeywords(e.target.value)} />
         </Field>

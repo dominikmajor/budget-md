@@ -172,7 +172,7 @@ const graphemes = (str) => {
 };
 
 /** Egyetlen, szabadon beírt emoji: a beírt szövegből az utolsó emojit tartja meg. */
-export function EmojiInput({ value, onChange, label = 'Ikon (emoji)' }) {
+export function EmojiInput({ value, onChange, label = 'Ikon (emoji)', bare = false }) {
   const [warn, setWarn] = useState(false);
   const change = (text) => {
     const emojis = graphemes(text).filter(isEmoji);
@@ -182,11 +182,61 @@ export function EmojiInput({ value, onChange, label = 'Ikon (emoji)' }) {
     onChange(emojis[emojis.length - 1]);
   };
   return (
-    <div className="emoji-input">
-      <span className="emoji-preview" aria-hidden="true">{value || '?'}</span>
+    <div className={`emoji-input ${bare ? 'bare' : ''}`}>
+      {!bare && <span className="emoji-preview" aria-hidden="true">{value || '?'}</span>}
       <input className="input" value={value} onChange={(e) => change(e.target.value)} placeholder="pl. 🍕" inputMode="text"
         autoComplete="off" aria-label={label} />
       {warn && <span className="field-hint warn">Csak emoji lehet az ikon.</span>}
     </div>
+  );
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+/** #rgb vagy #rrggbb (kettőskereszt nélkül is) → #rrggbb, különben null. */
+export function normalizeHex(v) {
+  let s = String(v || '').trim().replace(/^#?/, '#').toLowerCase();
+  if (/^#[0-9a-f]{3}$/.test(s)) s = '#' + [...s.slice(1)].map((c) => c + c).join('');
+  return HEX.test(s) ? s : null;
+}
+
+/** Tetszőleges szín: a rendszer RGB színkeverője, mellette hex kód kézzel is beírható. */
+export function ColorInput({ value, onChange, label = 'Szín' }) {
+  const [text, setText] = useState(value || '');
+  useEffect(() => { setText(value || ''); }, [value]);
+  const typed = (t) => {
+    setText(t);
+    const hex = normalizeHex(t);
+    if (hex) onChange(hex);
+  };
+  const invalid = text && !normalizeHex(text);
+  return (
+    <div className="color-input">
+      <label className="color-swatch" style={{ background: normalizeHex(value) || '#888888' }}>
+        <input type="color" value={normalizeHex(value) || '#888888'} onChange={(e) => onChange(e.target.value)} aria-label={`${label} – színkeverő`} />
+      </label>
+      <input className="input mono" value={text} onChange={(e) => typed(e.target.value)} onBlur={() => setText(value || '')}
+        placeholder="#22c55e" maxLength={7} autoComplete="off" spellCheck={false} aria-label={`${label} – hex kód`} />
+      {invalid && <span className="field-hint warn">Hex kód kell, pl. #22c55e</span>}
+    </div>
+  );
+}
+
+/**
+ * Közös ikon + szín választó (kategóriák, tárcák, borítékok, széfek):
+ * szabadon beírt emoji és tetszőleges RGB szín, élő előnézettel.
+ */
+export function IconColorPicker({ icon, color, onIcon, onColor, label = 'Ikon' }) {
+  return (
+    <>
+      <Field label="Ikon (emoji)" hint={EMOJI_HINT}>
+        <div className="icon-color-preview-wrap">
+          <span className="icon-color-preview" style={{ '--c': normalizeHex(color) || '#888888' }} aria-hidden="true">{icon || '?'}</span>
+          <EmojiInput value={icon} onChange={onIcon} label={`${label} (emoji)`} bare />
+        </div>
+      </Field>
+      <Field label="Szín" hint="Koppints a színmintára a színkeverőhöz, vagy írd be a hex kódot">
+        <ColorInput value={color} onChange={onColor} label={`${label} színe`} />
+      </Field>
+    </>
   );
 }

@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { Archive, ArchiveRestore, Scale } from 'lucide-react';
 import Sheet from './Sheet.jsx';
-import { AmountInput, EmojiInput, EMOJI_HINT, Field, Segmented } from './ui.jsx';
+import { AmountInput, Field, IconColorPicker, Segmented } from './ui.jsx';
 import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import { formatHUF, WALLET_KIND, isGoalKind, isLiquidKind } from '../lib/util.js';
 import { DEFAULT_WALLET_ICON } from '@budget/shared/wallets';
 
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#ef4444', '#84cc16', '#f97316', '#64748b'];
-const ICONS = ['🏦', '💳', '👛', '🗂️', '✉️', '🔐', '🏖️', '🛡️', '💻', '🎓', '🚗', '🎁', '🏠', '📱', '✈️', '💰'];
 
 /** Tárca, boríték vagy széf létrehozása / szerkesztése. */
 export default function WalletSheet({ onClose, id, kind: initialKind = 'account' }) {
@@ -53,22 +52,16 @@ export default function WalletSheet({ onClose, id, kind: initialKind = 'account'
     <Sheet title={existing ? `${existing.name} szerkesztése` : `Új ${noun}`} onClose={onClose} tall>
       <div className="form">
         {!existing && !isGoal && (
-          <Segmented small value={kind} onChange={setKind}
+          <Segmented small value={kind} onChange={(k) => {
+            // ha az ikon még az alapértelmezett, kövesse a típust
+            if (icon === DEFAULT_WALLET_ICON[kind]) setIcon(DEFAULT_WALLET_ICON[k]);
+            setKind(k);
+          }}
             options={[{ value: 'account', label: 'Bankszámla' }, { value: 'cash', label: 'Készpénz' }, { value: 'reserve', label: 'Tartalék' }]} />
         )}
         <Field label="Név"><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={isVault ? 'pl. Utazás' : isGoal ? 'pl. Új laptop' : 'pl. Erste'} autoFocus={!existing} /></Field>
-        {isGoal ? (
-          <Field label="Ikon (emoji)" hint={EMOJI_HINT}>
-            <EmojiInput value={icon} onChange={setIcon} label={`${noun[0].toUpperCase()}${noun.slice(1)} ikonja (emoji)`} />
-          </Field>
-        ) : (
-        <Field label="Ikon">
-          <div className="icon-grid">{ICONS.map((i) => <button type="button" key={i} className={icon === i ? 'on' : ''} onClick={() => setIcon(i)}>{i}</button>)}</div>
-        </Field>
-        )}
-        <Field label="Szín">
-          <div className="color-grid">{COLORS.map((c) => <button type="button" key={c} className={color === c ? 'on' : ''} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />)}</div>
-        </Field>
+        <IconColorPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor}
+          label={`${noun[0].toUpperCase()}${noun.slice(1)} ikonja`} />
         {!existing && <Field label="Kezdőegyenleg"><AmountInput value={initialBalance} onChange={setInitialBalance} /></Field>}
         {isGoal && (
           <>

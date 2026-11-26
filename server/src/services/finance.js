@@ -115,7 +115,7 @@ export async function createWallet(db, input) {
       name,
       input.kind,
       input.icon ? cleanIcon(input.icon) : defaultIcon(input.kind),
-      input.color || '#7c5cff',
+      input.color ? cleanColor(input.color) : '#7c5cff',
       int(input.initialBalance) || 0,
       int(input.targetAmount) || null,
       input.targetDate || null,
@@ -130,7 +130,7 @@ export async function updateWallet(db, id, input) {
   const fields = {
     name: (v) => { const s = String(v).trim(); if (!s) throw bad('Adj nevet a tárcának'); return s; },
     icon: cleanIcon,
-    color: String,
+    color: cleanColor,
     targetAmount: (v) => int(v) || null,
     targetDate: (v) => v || null,
     keywords: (v) => cleanKeywords(v),
@@ -453,6 +453,14 @@ const nextSort = async (db, parentId, kind) =>
     [parentId, kind],
   )).rows[0].n;
 
+/** Tetszőleges RGB szín hex alakban (#rgb vagy #rrggbb) → #rrggbb. */
+function cleanColor(v) {
+  let s = String(v ?? '').trim().toLowerCase();
+  if (/^#[0-9a-f]{3}$/.test(s)) s = '#' + [...s.slice(1)].map((c) => c + c).join('');
+  if (!/^#[0-9a-f]{6}$/.test(s)) throw bad('A szín hex kód legyen, pl. #22c55e');
+  return s;
+}
+
 function cleanIcon(v) {
   const s = String(v ?? '').trim();
   if (!s) throw bad('Adj meg egy emojit ikonnak');
@@ -475,7 +483,7 @@ export async function createCategory(db, input) {
   const { rows } = await db.query(
     `INSERT INTO categories (name, kind, icon, color, keywords, parent_id, sort_order)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-    [name, kind, input.icon ? cleanIcon(input.icon) : (parent?.icon || '🏷️'), input.color || parent?.color || '#8b8fa3',
+    [name, kind, input.icon ? cleanIcon(input.icon) : (parent?.icon || '🏷️'), input.color ? cleanColor(input.color) : (parent?.color || '#8b8fa3'),
       cleanCatKeywords(input.keywords), parentId, await nextSort(db, parentId, kind)],
   );
   return rows[0].id;
@@ -492,7 +500,7 @@ export async function updateCategory(db, id, input) {
     set('name', name);
   }
   if (input.icon !== undefined) set('icon', cleanIcon(input.icon));
-  if (input.color !== undefined) set('color', String(input.color));
+  if (input.color !== undefined) set('color', cleanColor(input.color));
   if (input.keywords !== undefined) set('keywords', cleanCatKeywords(input.keywords));
   if (input.archived !== undefined) set('archived', !!input.archived);
   if (input.parentId !== undefined) {
