@@ -24,14 +24,14 @@
   --text-3: #868d8a;
 
   /* Márka – budget.md zöld */
-  --accent: #1f7a45;
-  --accent-strong: #19663a;  /* szövegként, linkekhez */
+  --accent: #3e9c35;
+  --accent-strong: #2f7d28;  /* szövegként, linkekhez */
   --accent-soft: color-mix(in srgb, var(--accent) 11%, transparent);
   --on-accent: #ffffff;
   --accent-grad: var(--accent); /* visszafelé kompatibilitás: nincs több színátmenet */
 
   /* Szemantikus színek – harmonizált, jól megkülönböztethető */
-  --pos: #16a34a;            /* bevétel */
+  --pos: #0f9068;            /* bevétel */
   --neg: #e5484d;            /* kiadás */
   --xfer: #3b6fd8;           /* átcsoportosítás */
   --warn: #c27c00;           /* piszkozat / figyelmeztetés */
@@ -69,12 +69,12 @@
     --text-2: #a7aeab;
     --text-3: #6f7774;
 
-    --accent: #5cb179;
-    --accent-strong: #79c793;
+    --accent: #3e9c35;
+    --accent-strong: #6cc262;
     --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
-    --on-accent: #06200f;
+    --on-accent: #ffffff;
 
-    --pos: #4ade80;
+    --pos: #34d399;
     --neg: #ff6b70;
     --xfer: #6ea2ff;
     --warn: #f2b53c;
