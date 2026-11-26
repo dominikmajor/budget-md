@@ -49,6 +49,10 @@ export function issueSession(res, pinVersion) {
   });
 }
 
+/** Rövid életű, aláírt token (pl. WebAuthn challenge cookie-hoz). */
+export const signShortLived = (payload, ttlMs) => sign({ ...payload, exp: Date.now() + ttlMs });
+export const verifyShortLived = (token) => verify(token);
+
 export function clearSession(res) {
   res.clearCookie(COOKIE, { path: '/' });
 }

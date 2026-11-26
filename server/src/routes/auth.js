@@ -5,6 +5,7 @@ import {
   MAX_ATTEMPTS, LOCKOUT_SECONDS,
 } from '../auth.js';
 import { getSettings } from '../services/finance.js';
+import { publicRoutes as webauthnPublic, protectedRoutes as webauthnProtected, hasCredentials } from './webauthn.js';
 
 const r = Router();
 
@@ -16,8 +17,13 @@ r.get('/status', async (req, res) => {
     pinLength: s.pin_length,
     authenticated: !!session && session.v === pinVersion(s.pin_hash),
     lockedUntil: s.locked_until && new Date(s.locked_until) > new Date() ? s.locked_until : null,
+    webauthn: s.pin_hash ? await hasCredentials() : false,
   });
 });
+
+// Face ID / biometrikus belépés (WebAuthn)
+r.use('/webauthn', webauthnPublic);
+r.use('/webauthn', requireAuth, webauthnProtected);
 
 // Első indítás: PIN beállítása (csak ha még nincs)
 r.post('/setup', async (req, res) => {
