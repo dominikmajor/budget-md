@@ -96,7 +96,7 @@ client/    React app (pages/, components/, styles.css)
 
 - Bekapcsolás: belépés PIN-nel → **Beállítások → Biztonság → „Face ID bekapcsolása ezen az eszközön”**. Eszközönként kell bekapcsolni (iPhone-on Face ID, Macen Touch ID, Windowson Windows Hello, Androidon ujjlenyomat/arc). Ugyanitt látszanak és törölhetők a regisztrált eszközök.
 - Ezután a PIN képernyő megnyitásakor az app magától felajánlja a Face ID-t; ha a böngésző ezt nem engedi (pl. Safari zárolás után), a billentyűzet bal alsó sarkában lévő arc ikonnal indítható. A PIN mindig működik tartalékként.
-- A passkey nyilvános kulcsa a `webauthn_credentials` táblában van (004-es migráció, automatikusan lefut). A titkos kulcs sosem hagyja el az eszközt.
+- A passkey nyilvános kulcsa a `webauthn_credentials` táblában van (005-ös migráció, automatikusan lefut). A titkos kulcs sosem hagyja el az eszközt.
 - Csak **HTTPS**-en vagy `localhost`-on működik (helyi hálózati IP-n, pl. `http://192.168.x.x:5173`, nem).
 - **RP ID / origin:** alapból a böngésző címéből számolódik, így a Vercel domainen beállítás nélkül is működik. Éles környezetben érdemes rögzíteni (Vercel → Settings → Environment Variables):
   - `WEBAUTHN_RP_ID=budget-md.vercel.app` – a domain, séma és port nélkül
