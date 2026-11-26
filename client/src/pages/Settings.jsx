@@ -1,0 +1,373 @@
+import { useRef, useState } from 'react';
+import { ChevronUp, ChevronDown, Pencil, Archive, ArchiveRestore, Plus, Trash2, Download, Upload, KeyRound, ChevronRight } from 'lucide-react';
+import { useApp } from '../store.jsx';
+import { api } from '../api.js';
+import Sheet from '../components/Sheet.jsx';
+import PinPad from '../components/PinPad.jsx';
+import { AmountInput, Card, Field, Segmented, SectionTitle, WalletPicker, CategoryPicker } from '../components/ui.jsx';
+import { formatHUF, downloadUrl } from '../lib/util.js';
+
+const EMOJIS = ['🍝', '🍦', '🧴', '🎓', '🚌', '🎉', '📦', '💼', '🎁', '✨', '☕', '🍺', '🛒', '👕', '💊', '🏋️', '📚', '🎮', '🏠', '📱', '💡', '🐶', '✂️', '🚕'];
+const COLORS = ['#f97316', '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#eab308', '#64748b', '#22c55e', '#f43f5e', '#0ea5e9', '#84cc16', '#a855f7'];
+
+export default function Settings() {
+  const [open, setOpen] = useState(null);
+  const sections = [
+    ['categories', '🏷️', 'Kategóriák kezelése', 'Kiadás és bevétel kategóriák'],
+    ['projects', '💼', 'Side-hustle projektek és címkék', 'Bevételi projektek, #címkék'],
+    ['templates', '⚡', 'Gyorsrögzítő sablonok', '1 kattintásos tételek a + gombnál'],
+    ['limits', '🎯', 'Keretek és tárca-szabályok', 'Irattartó célszint, Költős keret'],
+    ['security', '🔐', 'Biztonság', 'PIN-kód, automatikus zárolás'],
+    ['data', '💾', 'Adatok exportálása és mentés', 'CSV, JSON mentés és visszatöltés'],
+  ];
+  return (
+    <div className="stack">
+      <Card className="list-card">
+        {sections.map(([id, icon, title, sub]) => (
+          <button key={id} className="settings-row" onClick={() => setOpen(id)}>
+            <span className="settings-icon">{icon}</span>
+            <span className="grow"><b>{title}</b><small>{sub}</small></span>
+            <ChevronRight size={18} className="muted" />
+          </button>
+        ))}
+      </Card>
+      <p className="muted small center">Budget · egyfelhasználós, PIN-védett · adataid a saját adatbázisodban</p>
+      {open === 'categories' && <CategoriesSheet onClose={() => setOpen(null)} />}
+      {open === 'projects' && <ProjectsSheet onClose={() => setOpen(null)} />}
+      {open === 'templates' && <TemplatesSheet onClose={() => setOpen(null)} />}
+      {open === 'limits' && <LimitsSheet onClose={() => setOpen(null)} />}
+      {open === 'security' && <SecuritySheet onClose={() => setOpen(null)} />}
+      {open === 'data' && <DataSheet onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+function useReorder(path) {
+  const { mutate } = useApp();
+  return (list, index, dir) => {
+    const ids = list.map((x) => x.id);
+    const j = index + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[index], ids[j]] = [ids[j], ids[index]];
+    mutate(() => api.post(`/${path}/reorder`, { ids }));
+  };
+}
+
+function RowActions({ onUp, onDown, onEdit, onArchive, archived, onDelete }) {
+  return (
+    <div className="row-actions">
+      {onUp && <button className="icon-btn" onClick={onUp} aria-label="Fel"><ChevronUp size={16} /></button>}
+      {onDown && <button className="icon-btn" onClick={onDown} aria-label="Le"><ChevronDown size={16} /></button>}
+      {onEdit && <button className="icon-btn" onClick={onEdit} aria-label="Szerkesztés"><Pencil size={15} /></button>}
+      {onArchive && <button className="icon-btn" onClick={onArchive} aria-label={archived ? 'Visszaállítás' : 'Archiválás'}>{archived ? <ArchiveRestore size={15} /> : <Archive size={15} />}</button>}
+      {onDelete && <button className="icon-btn danger-text" onClick={onDelete} aria-label="Törlés"><Trash2 size={15} /></button>}
+    </div>
+  );
+}
+
+// ── Kategóriák
+function CategoriesSheet({ onClose }) {
+  const { state, mutate } = useApp();
+  const [kind, setKind] = useState('expense');
+  const [editing, setEditing] = useState(null);
+  const reorder = useReorder('categories');
+  const list = state.categories.filter((c) => c.kind === kind && !c.isSystem);
+  return (
+    <Sheet title="Kategóriák" onClose={onClose} tall>
+      <Segmented value={kind} onChange={setKind} options={[{ value: 'expense', label: 'Kiadás' }, { value: 'income', label: 'Bevétel' }]} />
+      <div className="edit-list">
+        {list.map((c, i) => (
+          <div key={c.id} className={`edit-row ${c.archived ? 'archived' : ''}`}>
+            <span className="rank-icon" style={{ '--c': c.color }}>{c.icon}</span>
+            <span className="grow">{c.name}</span>
+            <RowActions onUp={() => reorder(list, i, -1)} onDown={() => reorder(list, i, 1)} onEdit={() => setEditing(c)}
+              archived={c.archived} onArchive={() => mutate(() => api.put(`/categories/${c.id}`, { archived: !c.archived }))} />
+          </div>
+        ))}
+      </div>
+      <button className="btn ghost full" onClick={() => setEditing({ kind })}><Plus size={16} /> Új kategória</button>
+      {editing && <CategoryEditor item={editing} onClose={() => setEditing(null)} />}
+    </Sheet>
+  );
+}
+
+function CategoryEditor({ item, onClose }) {
+  const { mutate } = useApp();
+  const [name, setName] = useState(item.name || '');
+  const [icon, setIcon] = useState(item.icon || EMOJIS[0]);
+  const [color, setColor] = useState(item.color || COLORS[0]);
+  const [keywords, setKeywords] = useState((item.keywords || []).join(', '));
+  const save = async () => {
+    const body = { name, icon, color, keywords, kind: item.kind };
+    await mutate(() => (item.id ? api.put(`/categories/${item.id}`, body) : api.post('/categories', body)), 'Mentve');
+    onClose();
+  };
+  return (
+    <Sheet title={item.id ? 'Kategória szerkesztése' : 'Új kategória'} onClose={onClose}>
+      <div className="form">
+        <Field label="Név"><input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
+        <Field label="Ikon"><div className="icon-grid">{EMOJIS.map((e) => <button type="button" key={e} className={icon === e ? 'on' : ''} onClick={() => setIcon(e)}>{e}</button>)}</div></Field>
+        <Field label="Szín"><div className="color-grid">{COLORS.map((c) => <button type="button" key={c} className={color === c ? 'on' : ''} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />)}</div></Field>
+        <Field label="Gyorsbeviteli kulcsszavak" hint="Pl. „lidl, spar” – ezekre a szavakra automatikusan ez a kategória lesz kitöltve">
+          <input className="input" value={keywords} onChange={(e) => setKeywords(e.target.value)} />
+        </Field>
+        <button className="btn primary full" disabled={!name.trim()} onClick={save}>Mentés</button>
+      </div>
+    </Sheet>
+  );
+}
+
+// ── Projektek és címkék
+function ProjectsSheet({ onClose }) {
+  const { state, mutate } = useApp();
+  const [newName, setNewName] = useState('');
+  const [rename, setRename] = useState(null); // { kind, id, name }
+  const add = async () => {
+    if (!newName.trim()) return;
+    await mutate(() => api.post('/projects', { name: newName }), 'Projekt hozzáadva');
+    setNewName('');
+  };
+  const saveRename = async () => {
+    const path = rename.kind === 'tag' ? 'tags' : 'projects';
+    await mutate(() => api.put(`/${path}/${rename.id}`, { name: rename.name }), rename.kind === 'tag' ? 'Címke frissítve (azonos név esetén összevonva)' : 'Átnevezve');
+    setRename(null);
+  };
+  return (
+    <Sheet title="Projektek és címkék" onClose={onClose} tall>
+      <SectionTitle>Side-hustle projektek</SectionTitle>
+      <div className="edit-list">
+        {state.projects.map((p) => (
+          <div key={p.id} className={`edit-row ${p.archived ? 'archived' : ''}`}>
+            <i className="dot" style={{ background: p.color }} />
+            <span className="grow">{p.name}{p.archived && <small className="muted"> · lezárt</small>}</span>
+            <RowActions onEdit={() => setRename({ kind: 'project', id: p.id, name: p.name })} archived={p.archived}
+              onArchive={() => mutate(() => api.put(`/projects/${p.id}`, { archived: !p.archived }))} />
+          </div>
+        ))}
+      </div>
+      <div className="row gap">
+        <input className="input" placeholder="Új projekt, pl. Grafikai munkák" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <button className="btn primary" onClick={add}><Plus size={16} /></button>
+      </div>
+
+      <SectionTitle>Címkék</SectionTitle>
+      {state.tags.length ? (
+        <div className="edit-list">
+          {state.tags.map((t) => (
+            <div key={t.id} className="edit-row">
+              <span className="grow">#{t.name} <small className="muted">· {t.uses} tétel</small></span>
+              <RowActions onEdit={() => setRename({ kind: 'tag', id: t.id, name: t.name })}
+                onDelete={() => mutate(() => api.del(`/tags/${t.id}`), 'Címke törölve')} />
+            </div>
+          ))}
+        </div>
+      ) : <p className="muted">Még nincs címke. Rögzítéskor adhatsz hozzá, pl. #egyetem.</p>}
+      <p className="muted small">Tipp: ha egy címkét egy már létező nevére nevezel át, a kettő összevonódik.</p>
+
+      {rename && (
+        <Sheet title={rename.kind === 'tag' ? 'Címke átnevezése / összevonása' : 'Projekt átnevezése'} onClose={() => setRename(null)}>
+          <div className="form">
+            <input className="input" value={rename.name} onChange={(e) => setRename({ ...rename, name: e.target.value })} autoFocus />
+            <button className="btn primary full" onClick={saveRename}>Mentés</button>
+          </div>
+        </Sheet>
+      )}
+    </Sheet>
+  );
+}
+
+// ── Sablonok
+function TemplatesSheet({ onClose }) {
+  const { state, walletsById, mutate } = useApp();
+  const [editing, setEditing] = useState(null);
+  const reorder = useReorder('templates');
+  const list = state.templates;
+  return (
+    <Sheet title="Gyorsrögzítő sablonok" onClose={onClose} tall>
+      <div className="edit-list">
+        {list.map((t, i) => (
+          <div key={t.id} className="edit-row">
+            <span className="rank-icon">{t.emoji}</span>
+            <span className="grow">{t.name}<small className="muted"> · {formatHUF(t.amount)}{walletsById[t.walletId] ? ` · ${walletsById[t.walletId].name}` : ''}</small></span>
+            <RowActions onUp={() => reorder(list, i, -1)} onDown={() => reorder(list, i, 1)} onEdit={() => setEditing(t)}
+              onDelete={() => mutate(() => api.del(`/templates/${t.id}`), 'Sablon törölve')} />
+          </div>
+        ))}
+      </div>
+      <button className="btn ghost full" onClick={() => setEditing({ type: 'expense' })}><Plus size={16} /> Új sablon</button>
+      {editing && <TemplateEditor item={editing} onClose={() => setEditing(null)} />}
+    </Sheet>
+  );
+}
+
+function TemplateEditor({ item, onClose }) {
+  const { mutate } = useApp();
+  const [name, setName] = useState(item.name || '');
+  const [emoji, setEmoji] = useState(item.emoji || '⚡');
+  const [type, setType] = useState(item.type || 'expense');
+  const [amount, setAmount] = useState(item.amount ? String(item.amount) : '');
+  const [walletId, setWalletId] = useState(item.walletId ?? null);
+  const [categoryId, setCategoryId] = useState(item.categoryId ?? null);
+  const save = async () => {
+    const body = { name, emoji, type, amount: Number(amount), walletId, categoryId };
+    await mutate(() => (item.id ? api.put(`/templates/${item.id}`, body) : api.post('/templates', body)), 'Sablon mentve');
+    onClose();
+  };
+  return (
+    <Sheet title={item.id ? 'Sablon szerkesztése' : 'Új sablon'} onClose={onClose} tall>
+      <div className="form">
+        <Segmented value={type} onChange={(t) => { setType(t); setCategoryId(null); }} options={[{ value: 'expense', label: 'Kiadás', tone: 'neg' }, { value: 'income', label: 'Bevétel', tone: 'pos' }]} />
+        <Field label="Név"><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="pl. Kávé" /></Field>
+        <Field label="Ikon"><div className="icon-grid">{['☕', '🍦', '🚌', '🍕', '🥐', '🍺', '🛒', '🧴', '🎬', '💼', '⚡', '🚕'].map((e) => <button type="button" key={e} className={emoji === e ? 'on' : ''} onClick={() => setEmoji(e)}>{e}</button>)}</div></Field>
+        <Field label="Összeg"><AmountInput value={amount} onChange={setAmount} /></Field>
+        <Field label="Alapértelmezett tárca" hint="Tárca nélkül a sablon piszkozatként ment"><WalletPicker value={walletId} onChange={setWalletId} allowNone /></Field>
+        <Field label="Kategória"><CategoryPicker kind={type} value={categoryId} onChange={setCategoryId} /></Field>
+        <button className="btn primary full" disabled={!name.trim() || !Number(amount)} onClick={save}>Mentés</button>
+      </div>
+    </Sheet>
+  );
+}
+
+// ── Keretek
+function LimitsSheet({ onClose }) {
+  const { state, mutate } = useApp();
+  const s = state.settings;
+  const [reserveTarget, setReserveTarget] = useState(String(s.reserveTarget));
+  const [enabled, setEnabled] = useState(s.spendingEnabled);
+  const [period, setPeriod] = useState(s.spendingPeriod);
+  const [amount, setAmount] = useState(String(s.spendingAmount));
+  const [walletId, setWalletId] = useState(s.spendingWalletId);
+  const save = async () => {
+    await mutate(() => api.put('/settings', {
+      reserveTarget: Number(reserveTarget), spendingEnabled: enabled, spendingPeriod: period,
+      spendingAmount: Number(amount), spendingWalletId: walletId,
+    }), 'Beállítások mentve');
+    onClose();
+  };
+  return (
+    <Sheet title="Keretek és tárca-szabályok" onClose={onClose} tall>
+      <div className="form">
+        <Field label="Irattartó minimum célösszeg" hint="Ez alatt figyelmeztetés jelenik meg a Főoldalon"><AmountInput value={reserveTarget} onChange={setReserveTarget} /></Field>
+        <label className="switch-row">
+          <span>Költési keret bekapcsolva</span>
+          <input type="checkbox" className="switch" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        </label>
+        {enabled && (
+          <>
+            <Segmented value={period} onChange={setPeriod} options={[{ value: 'day', label: 'Napi keret' }, { value: 'week', label: 'Heti keret' }]} />
+            <Field label={period === 'day' ? 'Keret / nap' : 'Keret / hét'}><AmountInput value={amount} onChange={setAmount} /></Field>
+            <Field label="Melyik zsebre vonatkozik"><WalletPicker value={walletId} onChange={setWalletId} includeEnvelopes={false} /></Field>
+          </>
+        )}
+        <button className="btn primary full" onClick={save}>Mentés</button>
+      </div>
+    </Sheet>
+  );
+}
+
+// ── Biztonság
+function SecuritySheet({ onClose }) {
+  const { state, mutate, notify } = useApp();
+  const [step, setStep] = useState(null); // null | 'old' | 'new' | 'confirm'
+  const [oldPin, setOldPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [pin, setPin] = useState('');
+  const [len, setLen] = useState(state.settings.pinLength);
+  const [err, setErr] = useState(false);
+
+  const onPin = async (v) => {
+    setPin(v);
+    const target = step === 'old' ? state.settings.pinLength : len;
+    if (v.length !== target) return;
+    if (step === 'old') { setOldPin(v); setPin(''); setStep('new'); return; }
+    if (step === 'new') { setNewPin(v); setPin(''); setStep('confirm'); return; }
+    if (v !== newPin) { setErr(true); setTimeout(() => { setErr(false); setPin(''); setStep('new'); }, 450); return; }
+    try {
+      await api.post('/settings/pin', { oldPin, newPin: v });
+      notify('PIN-kód módosítva');
+      setStep(null); setPin('');
+    } catch (e) {
+      notify(e.message, 'error');
+      setStep('old'); setPin('');
+    }
+  };
+
+  const options = [[0, 'Azonnal'], [1, '1 perc'], [2, '2 perc'], [5, '5 perc'], [15, '15 perc']];
+
+  return (
+    <Sheet title="Biztonság" onClose={onClose} tall>
+      {step ? (
+        <div className="stack">
+          <p className="center lead">{step === 'old' ? 'Add meg a jelenlegi PIN-t' : step === 'new' ? 'Add meg az új PIN-t' : 'Ismételd meg az új PIN-t'}</p>
+          {step === 'new' && (
+            <Segmented small value={len} onChange={(l) => { setLen(l); setPin(''); }} options={[{ value: 4, label: '4 jegyű' }, { value: 6, label: '6 jegyű' }]} />
+          )}
+          <PinPad value={pin} length={step === 'old' ? state.settings.pinLength : len} onChange={onPin} error={err} />
+          <button className="link-btn center" onClick={() => { setStep(null); setPin(''); }}>Mégse</button>
+        </div>
+      ) : (
+        <div className="form">
+          <button className="btn ghost full" onClick={() => setStep('old')}><KeyRound size={16} /> PIN-kód módosítása</button>
+          <Field label="Automatikus zárolás" hint="Ennyi inaktivitás vagy háttérben töltött idő után újra PIN-t kér">
+            <div className="picker">
+              {options.map(([v, l]) => (
+                <button key={v} className={`chip ${state.settings.autolockMinutes === v ? 'on' : ''}`}
+                  onClick={() => mutate(() => api.put('/settings', { autolockMinutes: v }), `Automatikus zárolás: ${l}`)}>{l}</button>
+              ))}
+            </div>
+          </Field>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+// ── Adatok
+function DataSheet({ onClose }) {
+  const { refresh, notify } = useApp();
+  const fileRef = useRef();
+  const [pending, setPending] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const pick = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (data.app !== 'budget-app') throw new Error();
+      setPending({ data, name: f.name, count: data.tables?.transactions?.length || 0 });
+    } catch {
+      notify('Ez nem érvényes mentésfájl', 'error');
+    }
+  };
+  const restore = async () => {
+    setBusy(true);
+    try {
+      await api.post('/import', pending.data);
+      await refresh();
+      notify('Mentés visszatöltve');
+      setPending(null);
+    } catch (e) { notify(e.message, 'error'); } finally { setBusy(false); }
+  };
+
+  return (
+    <Sheet title="Adatok és mentés" onClose={onClose}>
+      <div className="form">
+        <button className="btn ghost full" onClick={() => downloadUrl('/api/export.csv')}><Download size={16} /> Tranzakciók letöltése (CSV, Excelhez)</button>
+        <button className="btn ghost full" onClick={() => downloadUrl('/api/export.json')}><Download size={16} /> Teljes mentés letöltése (JSON)</button>
+        <button className="btn ghost full" onClick={() => fileRef.current.click()}><Upload size={16} /> Mentés visszatöltése</button>
+        <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={pick} />
+        {pending && (
+          <div className="callout warn">
+            <p><b>{pending.name}</b> – {pending.count} tranzakció. A visszatöltés <b>lecseréli az összes jelenlegi adatot</b> (a PIN-kód marad).</p>
+            <div className="row gap">
+              <button className="btn ghost" onClick={() => setPending(null)}>Mégse</button>
+              <button className="btn danger grow" disabled={busy} onClick={restore}>Igen, visszatöltöm</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Sheet>
+  );
+}
