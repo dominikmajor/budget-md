@@ -386,13 +386,9 @@ export async function getCategoryMemory(db) {
 
 export async function getState(db) {
   const settings = await getSettings(db);
-  const [wallets, categories, templates, drafts, recent, memory] = await all(db, [
+  const [wallets, categories, drafts, recent, memory] = await all(db, [
     () => getWallets(db),
     () => getCategories(db),
-    () => db.query('SELECT * FROM templates ORDER BY sort_order, id').then((r) => r.rows.map((t) => ({
-      id: t.id, name: t.name, emoji: t.emoji, type: t.type, amount: t.amount,
-      walletId: t.wallet_id, categoryId: t.category_id, sortOrder: t.sort_order,
-    }))),
     () => db.query(`SELECT COUNT(*)::int AS n FROM transactions WHERE status = 'draft'`).then((r) => r.rows[0].n),
     () => listTransactions(db, { limit: 8 }),
     () => getCategoryMemory(db),
@@ -411,7 +407,6 @@ export async function getState(db) {
     wallets,
     summary: summarize(active),
     categories,
-    templates,
     draftCount: drafts,
     recent,
     memory,
@@ -528,7 +523,6 @@ export async function updateCategory(db, id, input) {
  *  - Ha tételek tartoznak hozzá, kötelező megmondani, hová kerüljenek:
  *    moveTo = másik (azonos típusú) kategória id-ja, vagy 'none' = kategória nélkül.
  *    Enélkül a törlés hibát ad, így véletlenül nem „tűnhet el” a besorolás.
- *  - A sablonok hivatkozása ugyanígy átkerül (vagy kiürül).
  */
 export async function deleteCategory(db, id, { moveTo } = {}) {
   const cur = await loadCategory(db, id);
@@ -546,7 +540,6 @@ export async function deleteCategory(db, id, { moveTo } = {}) {
     throw e;
   }
   await db.query('UPDATE transactions SET category_id = $1 WHERE category_id = $2', [target, id]);
-  await db.query('UPDATE templates SET category_id = $1 WHERE category_id = $2', [target, id]);
   await db.query('UPDATE categories SET parent_id = $1 WHERE parent_id = $2', [cur.parent_id, id]);
   await db.query('DELETE FROM categories WHERE id = $1', [id]);
   return { moved: used, target };

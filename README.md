@@ -29,8 +29,8 @@ utána megadod a kezdőegyenlegeket.
 > telefon böngészőjéből is kipróbálhatod. A „Kezdőképernyőhöz adás” után teljes képernyős appként fut.
 
 A migrációk az API indulásakor **automatikusan lefutnak** (külön is: `npm run db:migrate`).
-A seed létrehozza az 5 alapértelmezett tárolót (OTP Számla, Revolut, Költős, Irattartó, Nyaralás boríték),
-és 3 gyorsrögzítő sablont. Kategóriát nem tölt fel előre: a kategóriafát a Beállításokban építed fel nulláról, minden kategóriának egy általad beírt emoji az ikonja.
+A seed létrehozza az 5 alapértelmezett tárolót (OTP Számla, Revolut, Költős, Irattartó, Nyaralás boríték).
+Kategóriát nem tölt fel előre: a kategóriafát a Beállításokban építed fel nulláról, minden kategóriának egy általad beírt emoji az ikonja.
 
 ## Ellenőrzés
 
@@ -57,11 +57,11 @@ NODE_ENV=production npm start   # az API kiszolgálja a buildelt frontendet is a
 |---|---|
 | **PIN képernyő** | 4/6 jegyű PIN, Face ID / Touch ID / Windows Hello belépés (passkey, automatikusan felajánlva, a PIN tartalék), automatikus beléptetés, rázkódás + piros pontok hibánál, 5 hiba után 30 mp várakozás (szerveroldalon), automatikus zárolás háttérbe kerülés / inaktivitás után |
 | **Főoldal** | Irattartó riasztás „Feltöltés 30k-ra” gombbal, piszkozat-emlékeztető, hero kártya (likvid / félretett / teljes vagyon), szem ikonos elrejtés, tárca-kártyák, kiemelt borítékok, utolsó 8 tétel |
-| **Gyorsrögzítő (+)** | Szabadszöveges parser élő előnézettel (`fagyi 1500 költős`, `+4000 mama kp`, `10000 otp -> költős`), villám-piszkozat, 1 kattintásos sablonok, részletes űrlap (lépcsőzetes kategóriaválasztó alkategóriákkal, dátum, megjegyzés, blokk fotó kamerából) |
+| **Gyorsrögzítő (+)** | Szabadszöveges parser élő előnézettel (`fagyi 1500 költős`, `+4000 mama kp`), villám-piszkozat, részletes űrlap (kiadás / bevétel; lépcsőzetes kategóriaválasztó alkategóriákkal, dátum, megjegyzés, blokk fotó kamerából) |
 | **Tranzakciók** | Esti rendszerező (kártyán helyben tárca/kategória, zöld pipa vagy jobbra húzás, „Összes jóváhagyása”), napló keresővel és szűrőkkel (a kategória-szűrő az alkategóriák tételeit is mutatja), napi csoportosítás napi nettóval, részletnézet, szerkesztés/törlés pontos visszaszámolással |
-| **Tárcák** | Pénz mozgatása gyors-forgatókönyvekkel, havi be/ki forgalom, Irattartó célszint-csík, új tárca/boríték, archiválás, borítékok célösszeggel, céldátummal és javasolt heti félretétellel, Befizetés/Kivétel, egyenleg-igazítás (készpénz leltár → korrekciós tétel) |
+| **Tárcák** | Pénz mozgatása (átcsoportosítás tárcák, borítékok, széfek között) gyors-forgatókönyvekkel, havi be/ki forgalom, Irattartó célszint-csík, új tárca/boríték, archiválás, borítékok célösszeggel, céldátummal és javasolt heti félretétellel, Befizetés/Kivétel, egyenleg-igazítás (készpénz leltár → korrekciós tétel) |
 | **Statisztika** | Időszakválasztó, cash-flow oszlopdiagram (táblázat nézettel), bevételek és kiadások kategóriafa szerint (a főkategóriák összesítik az alkategóriákat, koppintással lefúrható), bevételi gyakoriság, kiadások fánkdiagramon előző időszakhoz mért változással |
-| **Beállítások** | Kategóriafa korlátlan mélységű alkategóriákkal (létrehozás, átnevezés, áthelyezés, sorrend, ikon, szín, archiválás, törlés, gyorsbeviteli kulcsszavak), sablonok, Irattartó célösszeg, PIN-csere, Face ID bekapcsolása / eszközök eltávolítása, zárolási idő, CSV/JSON export, JSON visszatöltés |
+| **Beállítások** | Kategóriafa korlátlan mélységű alkategóriákkal (létrehozás, átnevezés, áthelyezés, sorrend, ikon, szín, archiválás, törlés, gyorsbeviteli kulcsszavak), Irattartó célösszeg, PIN-csere, Face ID bekapcsolása / eszközök eltávolítása, zárolási idő, CSV/JSON export, JSON visszatöltés |
 
 ## Kategóriák
 

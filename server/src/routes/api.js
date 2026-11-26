@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { pool, withTx } from '../db.js';
 import * as F from '../services/finance.js';
 import { getStats } from '../services/stats.js';
-import { bad, notFound } from '../services/errors.js';
+import { bad } from '../services/errors.js';
 import { changePin } from './auth.js';
 import { exportJson, exportCsv, importJson } from '../services/backup.js';
 
@@ -72,66 +72,6 @@ r.post('/categories/reorder', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Sablonok
-const simple = {
-  templates: {
-    cols: { name: 'name', emoji: 'emoji', type: 'type', amount: 'amount', walletId: 'wallet_id', categoryId: 'category_id', sortOrder: 'sort_order' },
-    required: ['name', 'type', 'amount'],
-  },
-};
-
-for (const [table, def] of Object.entries(simple)) {
-  const pick = (body) => {
-    const cols = [];
-    const vals = [];
-    for (const [k, col] of Object.entries(def.cols)) {
-      if (body[k] === undefined) continue;
-      let v = body[k];
-      if (k === 'keywords') v = (Array.isArray(v) ? v : String(v).split(',')).map((s) => s.trim().toLowerCase()).filter(Boolean);
-      if (typeof v === 'string') v = v.trim();
-      if (v === '') v = null;
-      cols.push(col);
-      vals.push(v);
-    }
-    return { cols, vals };
-  };
-  r.post(`/${table}`, async (req, res) => {
-    const body = req.body || {};
-    for (const k of def.required) if (body[k] === undefined || body[k] === '') throw bad('Hiányzó mező: ' + k);
-    const { cols, vals } = pick(body);
-    if (!cols.includes('sort_order')) {
-      cols.push('sort_order');
-      vals.push((await pool.query(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM ${table}`)).rows[0].n);
-    }
-    const { rows } = await pool.query(
-      `INSERT INTO ${table} (${cols.join(',')}) VALUES (${cols.map((_, i) => '$' + (i + 1)).join(',')}) RETURNING id`,
-      vals,
-    );
-    res.status(201).json({ id: rows[0].id });
-  });
-  r.put(`/${table}/:id`, async (req, res) => {
-    const { cols, vals } = pick(req.body || {});
-    if (!cols.length) return res.json({ ok: true });
-    vals.push(id(req));
-    const { rowCount } = await pool.query(
-      `UPDATE ${table} SET ${cols.map((c, i) => `${c} = $${i + 1}`).join(', ')} WHERE id = $${vals.length}`,
-      vals,
-    );
-    if (!rowCount) throw notFound();
-    res.json({ ok: true });
-  });
-  r.post(`/${table}/reorder`, async (req, res) => {
-    const ids = req.body?.ids || [];
-    await withTx(async (db) => {
-      for (let i = 0; i < ids.length; i++) await db.query(`UPDATE ${table} SET sort_order = $1 WHERE id = $2`, [i + 1, ids[i]]);
-    });
-    res.json({ ok: true });
-  });
-}
-r.delete('/templates/:id', async (req, res) => {
-  await pool.query('DELETE FROM templates WHERE id = $1', [id(req)]);
-  res.json({ ok: true });
-});
 r.post('/wallets/reorder', async (req, res) => {
   const ids = req.body?.ids || [];
   await withTx(async (db) => {

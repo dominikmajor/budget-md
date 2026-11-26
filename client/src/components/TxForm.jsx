@@ -12,9 +12,11 @@ const TABS = [
 /**
  * Részletes űrlap – új tétel, szerkesztés és piszkozat kiegészítése is ezt használja.
  * onSubmit(payload, { asDraft })
+ * allowTransfer={false}: az Átcsoportosítás fül rejtve (a gyorsrögzítőben); szerkesztésnél marad.
  */
-export default function TxForm({ initial = {}, onSubmit, submitLabel = 'Mentés', allowDraft, existingReceiptUrl, busy }) {
-  const [type, setType] = useState(initial.type || 'expense');
+export default function TxForm({ initial = {}, onSubmit, submitLabel = 'Mentés', allowDraft, allowTransfer = true, existingReceiptUrl, busy }) {
+  const tabs = allowTransfer ? TABS : TABS.filter((t) => t.value !== 'transfer');
+  const [type, setType] = useState(!allowTransfer && initial.type === 'transfer' ? 'expense' : initial.type || 'expense');
   const [amount, setAmount] = useState(initial.amount ? String(initial.amount) : '');
   const [walletId, setWalletId] = useState(initial.walletId ?? null);
   const [toWalletId, setToWalletId] = useState(initial.toWalletId ?? null);
@@ -61,7 +63,7 @@ export default function TxForm({ initial = {}, onSubmit, submitLabel = 'Mentés'
 
   return (
     <form className="form" noValidate onSubmit={(e) => { e.preventDefault(); submit(false); }}>
-      <Segmented options={TABS} value={type} onChange={changeType} />
+      <Segmented options={tabs} value={type} onChange={changeType} />
       <AmountInput value={amount} onChange={setAmount} tone={tone} />
 
       {type === 'transfer' ? (

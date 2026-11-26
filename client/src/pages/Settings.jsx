@@ -5,8 +5,8 @@ import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import Sheet from '../components/Sheet.jsx';
 import PinPad from '../components/PinPad.jsx';
-import { AmountInput, Card, Field, Segmented, WalletPicker, CategoryPicker } from '../components/ui.jsx';
-import { formatHUF, downloadUrl } from '../lib/util.js';
+import { AmountInput, Card, Field, Segmented, CategoryPicker } from '../components/ui.jsx';
+import { downloadUrl } from '../lib/util.js';
 import { biometricLabel, biometricRegister, isCancel, platformAuthAvailable } from '../lib/biometric.js';
 
 const COLORS = ['#f97316', '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#eab308', '#64748b', '#22c55e', '#f43f5e', '#0ea5e9', '#84cc16', '#a855f7'];
@@ -15,7 +15,6 @@ export default function Settings() {
   const [open, setOpen] = useState(null);
   const sections = [
     ['categories', '🏷️', 'Kategóriák kezelése', 'Kategóriák és alkategóriák tetszőleges mélységben'],
-    ['templates', '⚡', 'Gyorsrögzítő sablonok', '1 kattintásos tételek a + gombnál'],
     ['reserve', '🗂️', 'Irattartó célszint', 'Figyelmeztetés a Főoldalon, ha ez alá csökken'],
     ['security', '🔐', 'Biztonság', 'PIN-kód, Face ID, automatikus zárolás'],
     ['data', '💾', 'Adatok exportálása és mentés', 'CSV, JSON mentés és visszatöltés'],
@@ -33,7 +32,6 @@ export default function Settings() {
       </Card>
       <p className="muted small center">budget.md · egyfelhasználós, PIN-védett · adataid a saját adatbázisodban</p>
       {open === 'categories' && <CategoriesSheet onClose={() => setOpen(null)} />}
-      {open === 'templates' && <TemplatesSheet onClose={() => setOpen(null)} />}
       {open === 'reserve' && <ReserveSheet onClose={() => setOpen(null)} />}
       {open === 'security' && <SecuritySheet onClose={() => setOpen(null)} />}
       {open === 'data' && <DataSheet onClose={() => setOpen(null)} />}
@@ -212,58 +210,6 @@ function CategoryDelete({ item, onClose }) {
           <button className="btn ghost" onClick={onClose}>Mégse</button>
           <button className="btn danger grow" disabled={busy || target === undefined} onClick={remove}><Trash2 size={16} /> Törlés</button>
         </div>
-      </div>
-    </Sheet>
-  );
-}
-
-// ── Sablonok
-function TemplatesSheet({ onClose }) {
-  const { state, walletsById, mutate } = useApp();
-  const [editing, setEditing] = useState(null);
-  const reorder = useReorder('templates');
-  const list = state.templates;
-  return (
-    <Sheet title="Gyorsrögzítő sablonok" onClose={onClose} tall>
-      <div className="edit-list">
-        {list.map((t, i) => (
-          <div key={t.id} className="edit-row">
-            <span className="rank-icon">{t.emoji}</span>
-            <span className="grow">{t.name}<small className="muted"> · {formatHUF(t.amount)}{walletsById[t.walletId] ? ` · ${walletsById[t.walletId].name}` : ''}</small></span>
-            <RowActions onUp={() => reorder(list, i, -1)} onDown={() => reorder(list, i, 1)} onEdit={() => setEditing(t)}
-              onDelete={() => mutate(() => api.del(`/templates/${t.id}`), 'Sablon törölve')} />
-          </div>
-        ))}
-      </div>
-      <button className="btn ghost full" onClick={() => setEditing({ type: 'expense' })}><Plus size={16} /> Új sablon</button>
-      {editing && <TemplateEditor item={editing} onClose={() => setEditing(null)} />}
-    </Sheet>
-  );
-}
-
-function TemplateEditor({ item, onClose }) {
-  const { mutate } = useApp();
-  const [name, setName] = useState(item.name || '');
-  const [emoji, setEmoji] = useState(item.emoji || '⚡');
-  const [type, setType] = useState(item.type || 'expense');
-  const [amount, setAmount] = useState(item.amount ? String(item.amount) : '');
-  const [walletId, setWalletId] = useState(item.walletId ?? null);
-  const [categoryId, setCategoryId] = useState(item.categoryId ?? null);
-  const save = async () => {
-    const body = { name, emoji, type, amount: Number(amount), walletId, categoryId };
-    await mutate(() => (item.id ? api.put(`/templates/${item.id}`, body) : api.post('/templates', body)), 'Sablon mentve');
-    onClose();
-  };
-  return (
-    <Sheet title={item.id ? 'Sablon szerkesztése' : 'Új sablon'} onClose={onClose} tall>
-      <div className="form">
-        <Segmented value={type} onChange={(t) => { setType(t); setCategoryId(null); }} options={[{ value: 'expense', label: 'Kiadás', tone: 'neg' }, { value: 'income', label: 'Bevétel', tone: 'pos' }]} />
-        <Field label="Név"><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="pl. Kávé" /></Field>
-        <Field label="Ikon"><div className="icon-grid">{['☕', '🍦', '🚌', '🍕', '🥐', '🍺', '🛒', '🧴', '🎬', '💼', '⚡', '🚕'].map((e) => <button type="button" key={e} className={emoji === e ? 'on' : ''} onClick={() => setEmoji(e)}>{e}</button>)}</div></Field>
-        <Field label="Összeg"><AmountInput value={amount} onChange={setAmount} /></Field>
-        <Field group label="Alapértelmezett tárca" hint="Tárca nélkül a sablon piszkozatként ment"><WalletPicker value={walletId} onChange={setWalletId} allowNone /></Field>
-        <Field group label="Kategória"><CategoryPicker kind={type} value={categoryId} onChange={setCategoryId} /></Field>
-        <button className="btn primary full" disabled={!name.trim() || !Number(amount)} onClick={save}>Mentés</button>
       </div>
     </Sheet>
   );

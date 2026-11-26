@@ -7,7 +7,7 @@ import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import { formatHUF, TYPE_META, haptic } from '../lib/util.js';
 
-/** Globális gyorsrögzítő: szabadszöveges bevitel, villám-piszkozat, sablonok, részletes űrlap. */
+/** Globális gyorsrögzítő: szabadszöveges bevitel, villám-piszkozat, részletes űrlap (átcsoportosítás nélkül). */
 export default function QuickAdd({ onClose, mode: initialMode = 'text', initial }) {
   const { state, walletsById, categoriesById, categoryLabel, mutate } = useApp();
   const [mode, setMode] = useState(initialMode);
@@ -30,43 +30,24 @@ export default function QuickAdd({ onClose, mode: initialMode = 'text', initial 
   };
 
   const fromParsed = () => ({
-    type: parsed.type, amount: parsed.amount, walletId: parsed.walletId, toWalletId: parsed.toWalletId,
+    type: parsed.type, amount: parsed.amount, walletId: parsed.walletId,
     name: parsed.name, categoryId: parsed.categoryId,
   });
-
-  const useTemplate = (t) =>
-    save({ type: t.type, amount: t.amount, walletId: t.walletId, categoryId: t.categoryId, name: t.name },
-      { asDraft: !t.walletId, message: `${t.emoji} ${t.name} mentve` });
 
   if (mode === 'form') {
     return (
       <Sheet title="Új tétel" onClose={onClose} tall>
-        <TxForm initial={initial || fromParsed()} onSubmit={(p, o) => save(p, o)} allowDraft busy={busy} />
+        <TxForm initial={initial || fromParsed()} onSubmit={(p, o) => save(p, o)} allowDraft allowTransfer={false} busy={busy} />
       </Sheet>
     );
   }
 
   const meta = TYPE_META[parsed.type];
   const w = walletsById[parsed.walletId];
-  const w2 = walletsById[parsed.toWalletId];
   const cat = categoriesById[parsed.categoryId];
 
   return (
     <Sheet title="Gyorsrögzítő" onClose={onClose}>
-      {state.templates.length > 0 && (
-        <div className="templates">
-          {state.templates.map((t) => (
-            <button key={t.id} className="template" onClick={() => useTemplate(t)} disabled={busy}>
-              <span className="template-emoji">{t.emoji}</span>
-              <span className="template-text">
-                <b>{t.name}</b>
-                <small>{formatHUF(t.amount)}{walletsById[t.walletId] ? ` · ${walletsById[t.walletId].name}` : ''}</small>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
       <form onSubmit={(e) => { e.preventDefault(); if (parsed.valid) save(fromParsed()); }}>
         <div className="smart-input">
           <Sparkles size={18} className="smart-icon" />
@@ -83,7 +64,6 @@ export default function QuickAdd({ onClose, mode: initialMode = 'text', initial 
 
         <div className="hint-row">
           <span><code>+</code> bevétel</span>
-          <span><code>-&gt;</code> átcsoportosítás</span>
           <span><code>otp</code> <code>revo</code> <code>kp</code></span>
         </div>
 
@@ -91,18 +71,14 @@ export default function QuickAdd({ onClose, mode: initialMode = 'text', initial 
           <div className={`preview ${meta.cls}`}>
             <span className={`pill ${meta.cls}`}>{meta.label}</span>
             <div className="preview-main">
-              <b>{parsed.name || (parsed.type === 'transfer' ? 'Átcsoportosítás' : '—')}</b>
+              <b>{parsed.name || '—'}</b>
               <span className={`money ${meta.cls}`}>
-                {parsed.amount ? (parsed.type === 'transfer' ? `⇄ ${formatHUF(parsed.amount)}` : formatHUF(parsed.type === 'expense' ? -parsed.amount : parsed.amount, { sign: true })) : '? Ft'}
+                {parsed.amount ? formatHUF(parsed.type === 'expense' ? -parsed.amount : parsed.amount, { sign: true }) : '? Ft'}
               </span>
             </div>
             <div className="preview-meta">
-              {parsed.type === 'transfer' ? (
-                <span>{w ? `${w.icon} ${w.name}` : <em>forrás?</em>} → {w2 ? `${w2.icon} ${w2.name}` : <em>cél?</em>}</span>
-              ) : (
-                <span>Tárca: {w ? `${w.icon} ${w.name}` : <em>nincs megadva</em>}</span>
-              )}
-              {parsed.type !== 'transfer' && <span>Kategória: {cat ? `${cat.icon} ${categoryLabel(cat.id)}` : <em>—</em>}</span>}
+              <span>Tárca: {w ? `${w.icon} ${w.name}` : <em>nincs megadva</em>}</span>
+              <span>Kategória: {cat ? `${cat.icon} ${categoryLabel(cat.id)}` : <em>—</em>}</span>
             </div>
           </div>
         )}

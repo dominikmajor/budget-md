@@ -115,6 +115,7 @@ try {
     check('Jóváhagyás után 0 piszkozat', () => assert.equal(s.draftCount, 0));
     check('Költős: 7 000 → 5 500', () => assert.equal(s.wallets.find((w) => w.name === 'Költős').balance, 5500));
     check('Nincs költési keret az állapotban (tisztán nyilvántartás)', () => assert.equal('spending' in s, false));
+    check('Nincsenek gyorsrögzítő sablonok az állapotban', () => assert.equal('templates' in s, false));
   }
 
   console.log('\n3. DM 2 500 Revolutról — "dm 2500 revo"');
@@ -159,15 +160,18 @@ try {
     check('Riasztás aktív: 5 000 Ft hiányzik a 30 000 Ft-os célhoz', () => assert.equal(alert?.missing, 5000));
   }
 
-  console.log('\n6. Irattartó pótlása és félretétel — "5000 otp -> irattartó", "10000 otp -> nyaralás"');
+  console.log('\n6. Irattartó pótlása és félretétel — Tárcák › Pénz mozgatása: OTP → Irattartó 5 000, OTP → Nyaralás 10 000');
   {
     const statsBefore = await getStats(db, today());
-    for (const text of ['5000 otp -> irattartó', '10000 otp -> nyaralás']) {
-      const p = parseQuickEntry(text, await ctx());
-      assert.equal(p.type, 'transfer');
-      assert.equal(p.valid, true, `nem értelmezhető: ${text}`);
-      await F.createTransaction(db, p);
-    }
+    const p = parseQuickEntry('5000 otp -> irattartó', await ctx());
+    check('A gyorsrögzítő nem csinál átcsoportosítást a nyílból', () => {
+      assert.notEqual(p.type, 'transfer');
+      assert.equal('toWalletId' in p, false);
+    });
+    // Ugyanaz a hívás, amit a Tárcák oldal „Pénz mozgatása” lapja küld
+    const otp = await wid('OTP Számla');
+    await F.createTransaction(db, { type: 'transfer', amount: 5000, walletId: otp, toWalletId: await wid('Irattartó'), name: '' });
+    await F.createTransaction(db, { type: 'transfer', amount: 10000, walletId: otp, toWalletId: await wid('Nyaralás'), name: '' });
     const s = await state();
     const b = Object.fromEntries(s.wallets.map((w) => [w.name, w.balance]));
     const nyaralas = s.wallets.find((w) => w.name === 'Nyaralás');
@@ -275,7 +279,7 @@ try {
     await expectFail('A rendszer-kategória nem törölhető', () => F.deleteCategory(db, s.categories.find((c) => c.isSystem).id, { moveTo: 'none' }), /rendszer/);
   }
 
-  console.log('\nSzéfek (Revolut Vaults) — "8000 revo > széf utazás"');
+  console.log('\nSzéfek (Revolut Vaults) — Pénz mozgatása: Revolut → Utazás széf 8 000');
   {
     const before = await state();
     const vaultId = await F.createWallet(db, { name: 'Utazás', kind: 'vault', targetAmount: 200000 });
@@ -287,10 +291,10 @@ try {
       assert.deepEqual(vault.keywords, ['utazas']);
       assert.equal(vault.liquid, false);
     });
-    const p = parseQuickEntry('8000 revo > széf utazás', await ctx());
-    check('Gyorsbevitel: Revolut → Utazás széf', () =>
-      assert.deepEqual([p.type, p.amount, p.walletId, p.toWalletId, p.valid], ['transfer', 8000, idIn(before, 'Revolut'), vaultId, true]));
-    await F.createTransaction(db, p);
+    const p = parseQuickEntry('taxi 3000 széf utazás', await ctx());
+    check('Gyorsbevitel: „széf utazás” a széfet választja tárcának (kiadásként)', () =>
+      assert.deepEqual([p.type, p.walletId, p.name], ['expense', vaultId, 'Taxi']));
+    await F.createTransaction(db, { type: 'transfer', amount: 8000, walletId: idIn(before, 'Revolut'), toWalletId: vaultId, name: '' });
     s = await state();
     const v = s.wallets.find((w) => w.id === vaultId);
     check('Széf 8 000 Ft, 4% a 200 000 Ft-os célból', () => {
@@ -323,7 +327,9 @@ try {
   {
     const before = await state();
     const backup = JSON.parse(JSON.stringify(await exportJson(db)));
-    await importJson(db, backup);
+    check('A JSON mentésben nincsenek sablonok', () => assert.equal('templates' in backup.tables, false));
+    // Régebbi mentés sablonokkal: a visszatöltés figyelmen kívül hagyja őket
+    await importJson(db, { ...backup, tables: { ...backup.tables, templates: [{ id: 1, name: 'Kávé', type: 'expense', amount: 850 }] } });
     const after = await state();
     check('JSON mentés → visszatöltés után azonosak az egyenlegek és a kategóriafa', () => {
       assert.deepEqual(after.summary, before.summary);
@@ -384,13 +390,14 @@ try {
     await db.query(await fs.readFile(new URL('006_remove_default_categories.sql', dir), 'utf8'));
     const left = (await db.query('SELECT name, parent_id FROM categories WHERE NOT is_system ORDER BY name')).rows;
     const { rows: [t2] } = await db.query('SELECT category_id FROM transactions WHERE id = $1', [tx.id]);
-    const tpl = (await db.query('SELECT COUNT(*)::int AS n FROM templates WHERE category_id IS NOT NULL')).rows[0].n;
     check('Migráció: csak a felhasználó saját kategóriái maradnak, a saját alkategória főkategória lett', () =>
       assert.deepEqual(left, [{ name: 'Saját', parent_id: null }, { name: 'Saját alkategória', parent_id: null }]));
-    check('Migráció: az alapkategóriás tétel és a sablonok kategória nélkül maradtak', () => {
-      assert.equal(t2.category_id, null);
-      assert.equal(tpl, 0);
-    });
+    check('Migráció: az alapkategóriás tétel kategória nélkül maradt', () => assert.equal(t2.category_id, null));
+
+    // 007: a sablonok táblája megszűnik
+    await db.query(await fs.readFile(new URL('007_remove_templates.sql', dir), 'utf8'));
+    const tg = await db.query(`SELECT to_regclass('${legacy}.templates') AS t`);
+    check('007: a gyorsrögzítő sablonok táblája megszűnt', () => assert.equal(tg.rows[0].t, null));
   }
 
   await db.query('ROLLBACK');

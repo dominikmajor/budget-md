@@ -1,6 +1,6 @@
 import { bad } from './errors.js';
 
-const TABLES = ['wallets', 'categories', 'transactions', 'templates'];
+const TABLES = ['wallets', 'categories', 'transactions'];
 const SETTINGS_COLS = ['autolock_minutes', 'reserve_target'];
 
 /** Teljes, visszaállítható mentés (a PIN hash nélkül). */
@@ -58,7 +58,7 @@ export function upgradeBackup(data) {
     return t;
   });
 
-  return { ...data, version: 2, tables: { wallets: tables.wallets, categories, transactions, templates: tables.templates }, settings: data.settings };
+  return { ...data, version: 2, tables: { wallets: tables.wallets, categories, transactions }, settings: data.settings };
 }
 
 /** Mentés visszatöltése: a meglévő adatokat lecseréli (tranzakcióban, hiba esetén semmi nem változik). */

@@ -6,9 +6,9 @@ import { depthOf, isActive } from './categories.js';
  *
  *   "fagyi 1500 költős"        -> Kiadás 1500, Költős
  *   "+4000 mama költős"        -> Bevétel 4000, Költős
- *   "10000 otp -> költős"      -> Átcsoportosítás OTP -> Költős
- *   "5000 otp > irattartó"     -> Átcsoportosítás OTP -> Irattartó
- *   "8000 revo > széf utazás"  -> Átcsoportosítás Revolut -> Utazás széf
+ *   "töltő 5000 széf laptop"   -> Kiadás 5000, Új laptop széf
+ *
+ * Átcsoportosítást a gyorsrögzítő nem kezel (az a Tárcák oldalon, a „Pénz mozgatása” gombbal megy).
  *
  * @param {string} text
  * @param {object} ctx
@@ -21,30 +21,23 @@ export function parseQuickEntry(text, { wallets = [], categories = [], memory = 
     type: 'expense',
     amount: null,
     walletId: null,
-    toWalletId: null,
     name: '',
     categoryId: null,
     valid: false,
   };
   if (!text || !text.trim()) return result;
 
-  // "->", "→" és ">" egységesítése önálló tokenné
-  const prepared = text.replace(/\s*(?:->|→|=>|>)\s*/g, ' > ');
-  const rawTokens = prepared.split(/\s+/).filter(Boolean);
+  const rawTokens = text.split(/\s+/).filter(Boolean);
 
   const walletIndex = buildWalletIndex(wallets.filter((w) => !w.archived));
-  const isTransfer = rawTokens.includes('>');
   const hasVaults = wallets.some((w) => w.kind === 'vault' && !w.archived);
 
   const nameTokens = [];
-  const leftWallets = [];
-  const rightWallets = [];
-  let side = 'left';
+  const foundWallets = [];
   let sign = null;
 
   for (let i = 0; i < rawTokens.length; i++) {
     const tok = rawTokens[i];
-    if (tok === '>') { side = 'right'; continue; }
 
     // Összeg felismerése: 1500, +4000, -2500, 16.000, 16k, 1,5k
     if (result.amount == null) {
@@ -68,15 +61,15 @@ export function parseQuickEntry(text, { wallets = [], categories = [], memory = 
     if (/^ft$/i.test(tok)) continue;
 
     // Tárca kulcsszó (egy- vagy kétszavas egyezés)
-    const two = i + 1 < rawTokens.length && rawTokens[i + 1] !== '>' ? normalize(tok + ' ' + rawTokens[i + 1]) : null;
+    const two = i + 1 < rawTokens.length ? normalize(tok + ' ' + rawTokens[i + 1]) : null;
     if (two && walletIndex.has(two)) {
-      (side === 'left' ? leftWallets : rightWallets).push(walletIndex.get(two));
+      foundWallets.push(walletIndex.get(two));
       i++;
       continue;
     }
     const one = normalize(tok);
     if (one && walletIndex.has(one)) {
-      (side === 'left' ? leftWallets : rightWallets).push(walletIndex.get(one));
+      foundWallets.push(walletIndex.get(one));
       continue;
     }
     // A „széf” jelzőszó önmagában nem kerül a megnevezésbe (pl. „széf új laptop”)
@@ -84,26 +77,11 @@ export function parseQuickEntry(text, { wallets = [], categories = [], memory = 
     nameTokens.push(tok);
   }
 
-  if (isTransfer) {
-    result.type = 'transfer';
-    result.walletId = leftWallets[0] ?? null;
-    result.toWalletId = rightWallets[0] ?? null;
-  } else {
-    result.type = sign === '+' ? 'income' : 'expense';
-    result.walletId = leftWallets[0] ?? rightWallets[0] ?? null;
-  }
-
+  result.type = sign === '+' ? 'income' : 'expense';
+  result.walletId = foundWallets[0] ?? null;
   result.name = capitalize(nameTokens.join(' '));
-
-  if (result.type !== 'transfer') {
-    result.categoryId = guessCategory(result.name, result.type, { categories, memory });
-  }
-
-  result.valid =
-    result.amount != null &&
-    (result.type === 'transfer'
-      ? result.walletId != null && result.toWalletId != null && result.walletId !== result.toWalletId
-      : result.walletId != null);
+  result.categoryId = guessCategory(result.name, result.type, { categories, memory });
+  result.valid = result.amount != null && result.walletId != null;
   return result;
 }
 
@@ -126,7 +104,7 @@ function buildWalletIndex(wallets) {
       if (word.length >= 3 && !idx.has(word)) idx.set(word, w.id);
     }
   }
-  // 3. kör: széfek „széf <név>” alakban is („10000 revo > széf utazás”);
+  // 3. kör: széfek „széf <név>” alakban is („3000 taxi széf utazás”);
   // ha csak egy széf van, maga a „széf” szó is rá mutat
   const vaults = wallets.filter((w) => w.kind === 'vault');
   for (const w of vaults) {
