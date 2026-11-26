@@ -6,6 +6,7 @@ import { api, qs } from '../api.js';
 import { Card, Chip, Empty, Money, Progress, SectionTitle } from '../components/ui.jsx';
 import TxRow from '../components/TxRow.jsx';
 import { dateKey, formatHUF, formatNumber } from '../lib/util.js';
+import { BP, useMediaQuery } from '../lib/useMediaQuery.js';
 
 const PRESETS = [
   { id: 'week', label: 'Ez a hét' },
@@ -46,6 +47,7 @@ export default function Analytics() {
   const [tag, setTag] = useState(null);
   const [tagTx, setTagTx] = useState(null);
   const [asTable, setAsTable] = useState(false);
+  const isTablet = useMediaQuery(BP.tablet);
 
   const range = preset === 'custom' ? custom : presetRange(preset);
 
@@ -104,7 +106,7 @@ export default function Analytics() {
               </table>
             ) : (
               <div className="chart">
-                <ResponsiveContainer width="100%" height={210}>
+                <ResponsiveContainer width="100%" height={isTablet ? 280 : 210}>
                   <BarChart data={chartData} barGap={2} barCategoryGap="22%" margin={{ top: 8, right: 4, left: -14, bottom: 0 }}>
                     <CartesianGrid vertical={false} stroke="var(--grid)" />
                     <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: 'var(--text-3)', fontSize: 11 }} interval="preserveStartEnd" minTickGap={8} />
@@ -118,6 +120,8 @@ export default function Analytics() {
             )}
           </Card>
 
+          <div className="stats-grid">
+          <section className="stack">
           <SectionTitle>Side-hustle és bevételi források</SectionTitle>
           <Card>
             {stats.incomeSources.length ? (
@@ -138,13 +142,15 @@ export default function Analytics() {
               </>
             ) : <Empty icon="💼" title="Nincs bevétel ebben az időszakban" />}
           </Card>
+          </section>
 
+          <section className="stack">
           <SectionTitle>Kiadások kategóriánként</SectionTitle>
           <Card>
             {stats.categories.length ? (
               <>
                 <div className="donut-wrap">
-                  <ResponsiveContainer width="100%" height={190}>
+                  <ResponsiveContainer width="100%" height={isTablet ? 230 : 190}>
                     <PieChart>
                       <Pie data={stats.categories} dataKey="amount" nameKey="name" innerRadius="64%" outerRadius="92%" paddingAngle={2} stroke="var(--surface)" strokeWidth={2} cornerRadius={4}>
                         {stats.categories.map((c) => <Cell key={c.name} fill={c.color} />)}
@@ -172,9 +178,10 @@ export default function Analytics() {
               </>
             ) : <Empty icon="🧾" title="Nincs kiadás ebben az időszakban" />}
           </Card>
+          </section>
 
           {(stats.tags.length > 0 || state.tags.length > 0) && (
-            <>
+            <section className="stack">
               <SectionTitle>Címkék</SectionTitle>
               <Card>
                 <div className="picker">
@@ -198,11 +205,11 @@ export default function Analytics() {
                   );
                 })()}
               </Card>
-            </>
+            </section>
           )}
 
           {stats.limit && (
-            <>
+            <section className="stack">
               <SectionTitle>Költős keret teljesítmény</SectionTitle>
               <Card>
                 <p className="lead">
@@ -227,8 +234,9 @@ export default function Analytics() {
                 </div>
                 <p className="muted small">Keret: {formatHUF(stats.limit.limit)} / {stats.limit.period === 'week' ? 'hét' : 'nap'}</p>
               </Card>
-            </>
+            </section>
           )}
+          </div>
         </>
       )}
     </div>

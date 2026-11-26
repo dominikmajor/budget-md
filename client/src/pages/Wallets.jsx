@@ -16,6 +16,7 @@ export default function Wallets() {
 
   return (
     <div className="stack">
+      <div className="wallets-top">
       <button className="big-action" onClick={() => openSheet('transfer')}>
         <span className="big-action-icon"><ArrowLeftRight size={22} /></span>
         <span><b>Pénz mozgatása</b><small>Átcsoportosítás tárcák és borítékok között</small></span>
@@ -26,11 +27,12 @@ export default function Wallets() {
         <div><span>Félretett</span><Money value={state.summary.saved} /></div>
         <div><span>Összesen</span><Money value={state.summary.total} /></div>
       </div>
+      </div>
 
       <SectionTitle action={<button className="link-btn" onClick={() => openSheet('wallet', { kind: 'account' })}><Plus size={16} /> Új tárca</button>}>
         Számlák és készpénz
       </SectionTitle>
-      <div className="stack-sm">
+      <div className="stack-sm pocket-list">
         {pockets.map((w) => <PocketCard key={w.id} w={w} />)}
       </div>
 

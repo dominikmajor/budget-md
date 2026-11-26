@@ -6,6 +6,7 @@ import { api, qs } from '../api.js';
 import { Card, Chip, Empty, Money, Segmented, TagInput } from '../components/ui.jsx';
 import TxRow from '../components/TxRow.jsx';
 import { dateKey, dayLabel, signedAmount, haptic } from '../lib/util.js';
+import { BP, useMediaQuery } from '../lib/useMediaQuery.js';
 
 export default function Transactions() {
   const { state } = useApp();
@@ -18,10 +19,12 @@ export default function Transactions() {
   };
   return (
     <div className="stack">
+      <div className="tx-tabs">
       <Segmented value={view} onChange={setView} options={[
         { value: 'drafts', label: `Rendszerezésre vár${state.draftCount ? ` (${state.draftCount})` : ''}` },
         { value: 'all', label: 'Összes pénzforgalom' },
       ]} />
+      </div>
       {view === 'drafts' ? <Drafts /> : <Journal />}
     </div>
   );
@@ -42,8 +45,8 @@ function Drafts() {
   const ready = items.filter((t) => t.walletId && (t.type !== 'transfer' || t.toWalletId));
 
   return (
-    <>
-      <div className="row between">
+    <div className="drafts">
+      <div className="row between drafts-head">
         <span className="muted">{items.length} tétel · {ready.length} kész a jóváhagyásra</span>
         <button className="btn small primary pos" disabled={!ready.length}
           onClick={() => mutate(() => api.post('/transactions/approve', { ids: ready.map((t) => t.id) }), `${ready.length} tétel véglegesítve`)}>
@@ -51,7 +54,7 @@ function Drafts() {
         </button>
       </div>
       {items.map((t) => <DraftCard key={t.id} tx={t} />)}
-    </>
+    </div>
   );
 }
 
@@ -125,8 +128,10 @@ function Journal() {
   const [params, setParams] = useSearchParams();
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [filtersOpen, setShowFilters] = useState(false);
   const [items, setItems] = useState(null);
+  const isDesktop = useMediaQuery(BP.desktop);
+  const showFilters = filtersOpen || isDesktop; // asztalon a szűrők állandóan látszanak
 
   const filters = {
     wallet: params.get('tarca') || '',
@@ -164,14 +169,15 @@ function Journal() {
   const hasEnvelopes = state.wallets.some((w) => w.kind === 'envelope');
 
   return (
-    <>
+    <div className="journal">
+      <div className="journal-filters">
       <div className="search-row">
         <div className="search">
           <Search size={18} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Keresés névben, megjegyzésben" />
           {q && <button className="icon-btn" onClick={() => setQ('')} aria-label="Törlés"><X size={16} /></button>}
         </div>
-        <button className={`icon-btn boxed ${showFilters || activeCount ? 'on' : ''}`} onClick={() => setShowFilters((s) => !s)} aria-label="Szűrők">
+        <button className={`icon-btn boxed mobile-only-flex ${showFilters || activeCount ? 'on' : ''}`} onClick={() => setShowFilters((s) => !s)} aria-label="Szűrők">
           <SlidersHorizontal size={18} />
           {activeCount > 0 && <span className="dot-count">{activeCount}</span>}
         </button>
@@ -224,6 +230,9 @@ function Journal() {
           {activeCount > 0 && <button className="link-btn" onClick={() => setParams({}, { replace: true })}>Szűrők törlése</button>}
         </Card>
       )}
+      </div>
+
+      <div className="journal-list">
 
       {!items ? <div className="loading" /> : !items.length ? (
         <Empty icon="🔍" title="Nincs találat" text={activeCount || q ? 'Próbálj más szűrőt.' : 'Még nincs véglegesített tétel.'} />
@@ -241,6 +250,7 @@ function Journal() {
           );
         })
       )}
-    </>
+      </div>
+    </div>
   );
 }
