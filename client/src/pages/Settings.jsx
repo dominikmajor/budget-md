@@ -22,7 +22,7 @@ export default function Settings() {
   ];
   return (
     <div className="stack">
-      <Card className="list-card">
+      <Card className="list-card settings-list">
         {sections.map(([id, icon, title, sub]) => (
           <button key={id} className="settings-row" onClick={() => setOpen(id)}>
             <span className="settings-icon">{icon}</span>

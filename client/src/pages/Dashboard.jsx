@@ -19,7 +19,9 @@ export default function Dashboard() {
   const otp = wallets.find((w) => w.keywords?.includes('otp')) || wallets.find((w) => w.kind === 'account');
 
   return (
-    <div className="stack">
+    <div className="dash">
+      {alerts.length > 0 && (
+      <div className="dash-alerts">
       {alerts.map((a) =>
         a.type === 'reserve' ? (
           <div key="reserve" className="alert warn">
@@ -40,7 +42,10 @@ export default function Dashboard() {
           </button>
         ),
       )}
+      </div>
+      )}
 
+      <div className="dash-main stack">
       <div className="hero">
         <div className="hero-top">
           <span>Azonnal elkölthető</span>
@@ -55,7 +60,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="hscroll">
+      <div className="hscroll pockets-row">
         {pockets.map((w) => {
           const isReserve = w.kind === 'reserve';
           const okReserve = w.balance >= settings.reserveTarget;
@@ -114,6 +119,9 @@ export default function Dashboard() {
         </>
       )}
 
+      </div>
+
+      <div className="dash-side stack">
       <SectionTitle action={<button className="link-btn" onClick={() => navigate('/tranzakciok')}>Összes</button>}>Legutóbbi pénzmozgások</SectionTitle>
       <Card className="list-card">
         {recent.length ? recent.map((t) => <TxRow key={t.id} tx={t} showDate />) : (
@@ -121,6 +129,7 @@ export default function Dashboard() {
             action={<button className="btn primary" onClick={() => openSheet('quick')}>Első tétel rögzítése</button>} />
         )}
       </Card>
+      </div>
     </div>
   );
 }

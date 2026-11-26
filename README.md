@@ -1,6 +1,9 @@
 # Budget – személyes pénzügyi és budget webalkalmazás
 
-Mobilközpontú, egyfelhasználós, PIN-kóddal védett pénzügyi nyilvántartó.
+Egyfelhasználós, PIN-kóddal védett pénzügyi nyilvántartó, minden képernyőméretre optimalizálva:
+mobilon alsó navigációs sáv és alulról felúszó panelek, tableten ikonos oldalsáv, asztali gépen
+teljes oldalsáv, többoszlopos oldalak és középre nyíló párbeszédablakok (gyorsrögzítő: **N** billentyű,
+a PIN billentyűzetről is beírható).
 **Stack:** React 19 + Vite (frontend) · Node.js + Express 5 (API) · PostgreSQL (Vercel Postgres / Neon).
 
 ## Gyors indítás (helyi fejlesztés)

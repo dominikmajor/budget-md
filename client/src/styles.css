@@ -115,7 +115,7 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 6px; font-
   border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
   animation: pop 0.3s ease;
 }
-.page { padding: 4px 16px calc(110px + var(--safe-b)); animation: fadeUp 0.28s ease; }
+.page { padding: 4px 16px calc(110px + var(--safe-b)); animation: fadeUp 0.28s ease; container-type: inline-size; }
 
 .icon-btn {
   width: 38px; height: 38px; border-radius: 12px;
@@ -590,11 +590,162 @@ textarea.input { height: auto; padding: 12px 15px; resize: vertical; }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-10px); } 40% { transform: translateX(10px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
 
-@media (min-width: 600px) {
-  .page { padding-top: 8px; }
-  .env-grid, .envelopes-mini { grid-template-columns: 1fr 1fr; }
-}
 
 .preview.pos, .preview.neg, .preview.xfer { color: var(--text); }
 .preview .pill.pos { color: var(--pos); } .preview .pill.neg { color: var(--neg); } .preview .pill.xfer { color: var(--xfer); }
 .btn { white-space: nowrap; }
+
+/* ═════════════════════════ Reszponzív elrendezés ═════════════════════════
+   Mobil (< 768px): alsó navigációs sáv, alulról felúszó panelek – változatlan.
+   Tablet (768–1099px): ikonos oldalsáv, középre nyíló párbeszédablakok.
+   Asztal (≥ 1100px): teljes oldalsáv feliratokkal, többoszlopos oldalak.
+   Az oldalakon belüli rácsok container query-vel a tényleges tartalomszélességhez igazodnak. */
+
+/* Elrendezés-blokkok alapértelmezése (mobil: egymás alatt) */
+.sidebar { display: none; }
+.app-main { min-width: 0; }
+.dash, .dash-alerts, .drafts, .journal, .journal-filters, .journal-list, .wallets-top, .stats-grid {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.dash-main, .dash-side { container-type: inline-size; min-width: 0; }
+.stats-grid > section, .stats-grid > .stack { min-width: 0; }
+
+/* Oldalsáv */
+.sidebar {
+  flex-direction: column; gap: 6px;
+  position: sticky; top: 0; height: 100dvh; overflow-y: auto;
+  padding: calc(18px + var(--safe-t)) 12px 18px;
+  background: color-mix(in srgb, var(--surface) 45%, var(--bg));
+  border-right: 1px solid var(--border);
+}
+.sb-brand { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 4px 0 14px; font-size: 18px; letter-spacing: -0.02em; }
+.sb-logo { width: 34px; height: 34px; border-radius: 11px; background: var(--accent-grad); box-shadow: 0 8px 20px -8px var(--accent); flex-shrink: 0; }
+.sb-new {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 48px; height: 48px; margin: 0 auto 10px; border-radius: 15px;
+  background: var(--accent-grad); color: #fff; font-weight: 700;
+  box-shadow: 0 10px 24px -10px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.12s, filter 0.15s;
+}
+.sb-new:hover { filter: brightness(1.08); }
+.sb-new:active { transform: scale(0.97); }
+.sb-new kbd {
+  margin-left: auto; font: inherit; font-size: 11.5px; font-weight: 700; line-height: 1;
+  padding: 4px 7px; border-radius: 6px; background: rgba(255, 255, 255, 0.2);
+}
+.sb-nav { display: flex; flex-direction: column; gap: 4px; }
+.sb-nav a, .sb-foot button {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 12px;
+  width: 48px; height: 46px; margin: 0 auto; border-radius: 13px;
+  color: var(--text-3); text-decoration: none; font-weight: 600; font-size: 14.5px; white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.sb-nav a:hover, .sb-foot button:hover { background: var(--hover); color: var(--text); }
+.sb-nav a.active { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+.sb-nav a.active svg { color: var(--accent); }
+.sb-count {
+  position: absolute; top: 5px; right: 4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: color-mix(in srgb, var(--warn) 22%, var(--surface)); color: var(--warn);
+  font-size: 11px; font-weight: 700; display: grid; place-items: center;
+}
+.sb-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 12px; border-top: 1px solid var(--border); }
+.sb-label { display: none; }
+
+/* Egérrel használt eszközök: hover visszajelzések */
+@media (hover: hover) {
+  .card.tappable:hover { border-color: var(--border-2); }
+  .btn:hover:not(:disabled) { filter: brightness(1.08); }
+  .chip:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border-2)); color: var(--text); }
+  .template:hover, .scenario:hover { border-color: var(--border-2); background: var(--surface-2); }
+  .pocket-xfer:hover { color: var(--text); background: var(--surface-2); }
+}
+
+/* Oldalakon belüli rácsok – a tartalomterület szélessége alapján */
+@container (min-width: 520px) {
+  .envelopes-mini { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .pockets-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    overflow: visible; margin: 0; padding: 0; scroll-snap-type: none;
+  }
+  .pocket { min-width: 0; }
+  .hero { padding: 24px 26px 22px; }
+  .hero-amount { font-size: 50px; }
+}
+@container (min-width: 560px) {
+  .env-grid { grid-template-columns: 1fr 1fr; }
+}
+@container (min-width: 700px) {
+  .dash-alerts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+  .wallets-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); align-items: stretch; }
+  .wallets-top .totals-row > div { justify-content: center; }
+  .pocket-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .settings-list { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+}
+@container (min-width: 800px) {
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 18px; align-items: start; }
+  .drafts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  .drafts-head { grid-column: 1 / -1; }
+}
+@container (min-width: 900px) {
+  .env-grid { grid-template-columns: repeat(3, 1fr); }
+  .dash { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); gap: 20px 22px; align-items: start; }
+  .dash-alerts { grid-column: 1 / -1; }
+}
+
+/* ───────── Tablet és nagyobb ───────── */
+@media (min-width: 768px) {
+  .app { max-width: none; display: grid; grid-template-columns: 80px minmax(0, 1fr); }
+  .sidebar { display: flex; }
+  .bottombar, .mobile-only, .mobile-only-flex { display: none !important; }
+
+  .topbar { padding: calc(22px + var(--safe-t)) 32px 14px; }
+  .topbar h1 { font-size: 28px; }
+  .page { padding: 6px 32px 48px; }
+  .toast { bottom: calc(28px + var(--safe-b)); }
+
+  .tx-tabs { max-width: 560px; }
+
+  /* Egérrel nehéz vízszintesen görgetni: a chip-sorok tördelődnek */
+  .picker.scroll, .sheet .picker.scroll, .card .picker.scroll, .templates {
+    flex-wrap: wrap; overflow: visible; margin: 0; padding: 0;
+  }
+
+  /* Alsó panelek helyett középre nyíló párbeszédablak */
+  .sheet-root { align-items: center; padding: 24px; }
+  .sheet {
+    max-width: 580px; max-height: min(88dvh, 900px); border-radius: 24px; overflow: hidden;
+    border-bottom: 1px solid var(--border-2);
+    animation: modalIn 0.22s cubic-bezier(.2, .9, .25, 1);
+    box-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.7);
+  }
+  .sheet.tall { height: auto; }
+  .sheet-root.closing .sheet { transform: scale(0.97); opacity: 0; transition: transform 0.18s ease-in, opacity 0.18s ease-in; }
+  .sheet-handle { display: none; }
+  .sheet-handle-zone { padding: 16px 20px 0 22px; touch-action: auto; }
+  .sheet-body { padding-bottom: 22px; }
+  .form-actions.sticky { bottom: -22px; margin-bottom: -22px; padding-bottom: 18px; }
+
+  .login { justify-content: center; gap: 44px; }
+}
+
+/* ───────── Asztal ───────── */
+@media (min-width: 1100px) {
+  .app { grid-template-columns: 248px minmax(0, 1fr); }
+  .sidebar { padding: calc(22px + var(--safe-t)) 16px 18px; }
+  .sb-label { display: inline; }
+  .sb-brand { justify-content: flex-start; padding: 4px 10px 18px; }
+  .sb-new { width: 100%; justify-content: flex-start; padding: 0 14px; height: 48px; }
+  .sb-nav a, .sb-foot button { width: 100%; justify-content: flex-start; padding: 0 14px; }
+  .sb-count { position: static; margin-left: auto; }
+
+  .topbar, .page { width: 100%; max-width: 1280px; margin: 0 auto; }
+  .topbar { padding-left: 40px; padding-right: 40px; }
+  .page { padding: 6px 40px 56px; }
+
+  /* Napló: szűrők állandóan látható oldalsó oszlopban */
+  .journal { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+  .journal-filters { order: 2; position: sticky; top: 88px; max-height: calc(100dvh - 104px); overflow-y: auto; }
+  .journal-list { order: 1; }
+}
+
+@keyframes modalIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }

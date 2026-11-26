@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Delete } from 'lucide-react';
 import { haptic } from '../lib/util.js';
 
@@ -8,6 +9,21 @@ export default function PinPad({ value, length, onChange, disabled, error, extra
     onChange(value + d);
   };
   const back = () => !disabled && onChange(value.slice(0, -1));
+
+  // Fizikai billentyűzet (asztali gép): számjegyek és Backspace
+  const latest = useRef({});
+  latest.current = { press, back };
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target;
+      if (t instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); latest.current.press(e.key); }
+      else if (e.key === 'Backspace') { e.preventDefault(); latest.current.back(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
   return (
     <div className="pin">
       <div className={`pin-dots ${error ? 'error shake' : ''}`} aria-label={`${value.length} / ${length} számjegy`}>
