@@ -4,39 +4,42 @@ import Sheet from './Sheet.jsx';
 import { AmountInput, Field, Segmented } from './ui.jsx';
 import { useApp } from '../store.jsx';
 import { api } from '../api.js';
-import { formatHUF, WALLET_KIND } from '../lib/util.js';
+import { formatHUF, WALLET_KIND, isGoalKind, isLiquidKind } from '../lib/util.js';
+import { DEFAULT_WALLET_ICON } from '@budget/shared/wallets';
 
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#ef4444', '#84cc16', '#f97316', '#64748b'];
-const ICONS = ['🏦', '💳', '👛', '🗂️', '✉️', '🏖️', '🛡️', '💻', '🎓', '🚗', '🎁', '🏠', '📱', '✈️', '🎸', '💰'];
+const ICONS = ['🏦', '💳', '👛', '🗂️', '✉️', '🔐', '🏖️', '🛡️', '💻', '🎓', '🚗', '🎁', '🏠', '📱', '✈️', '💰'];
 
-/** Tárca vagy boríték létrehozása / szerkesztése. */
+/** Tárca, boríték vagy széf létrehozása / szerkesztése. */
 export default function WalletSheet({ onClose, id, kind: initialKind = 'account' }) {
   const { walletsById, mutate, openSheet } = useApp();
   const existing = id ? walletsById[id] : null;
   const [kind, setKind] = useState(existing?.kind || initialKind);
   const [name, setName] = useState(existing?.name || '');
-  const [icon, setIcon] = useState(existing?.icon || (initialKind === 'envelope' ? '✉️' : '🏦'));
+  const [icon, setIcon] = useState(existing?.icon || DEFAULT_WALLET_ICON[initialKind] || '🏦');
   const [color, setColor] = useState(existing?.color || COLORS[4]);
   const [initialBalance, setInitialBalance] = useState(existing ? String(existing.initialBalance || '') : '');
   const [targetAmount, setTargetAmount] = useState(existing?.targetAmount ? String(existing.targetAmount) : '');
   const [targetDate, setTargetDate] = useState(existing?.targetDate || '');
   const [keywords, setKeywords] = useState(existing?.keywords?.join(', ') || '');
-  const [featured, setFeatured] = useState(existing?.featured ?? kind === 'envelope');
+  const [featured, setFeatured] = useState(existing?.featured ?? isGoalKind(kind));
   const [busy, setBusy] = useState(false);
 
-  const isEnvelope = kind === 'envelope';
+  const isGoal = isGoalKind(kind); // boríték vagy széf: célösszeg, kiemelés
+  const isVault = kind === 'vault';
+  const noun = isVault ? 'széf' : kind === 'envelope' ? 'boríték' : 'tárca';
 
   const save = async () => {
     setBusy(true);
     const body = {
       name, kind, icon, color, keywords,
-      targetAmount: isEnvelope ? Number(targetAmount) || null : null,
-      targetDate: isEnvelope ? targetDate || null : null,
-      featured: isEnvelope ? featured : false,
+      targetAmount: isGoal ? Number(targetAmount) || null : null,
+      targetDate: isGoal ? targetDate || null : null,
+      featured: isGoal ? featured : false,
     };
     try {
       if (existing) await mutate(() => api.put(`/wallets/${id}`, body), 'Mentve');
-      else await mutate(() => api.post('/wallets', { ...body, initialBalance: Number(initialBalance) || 0 }), isEnvelope ? 'Boríték létrehozva' : 'Tárca létrehozva');
+      else await mutate(() => api.post('/wallets', { ...body, initialBalance: Number(initialBalance) || 0 }), `${noun[0].toUpperCase()}${noun.slice(1)} létrehozva`);
       onClose();
     } catch { /* toast */ } finally { setBusy(false); }
   };
@@ -47,13 +50,13 @@ export default function WalletSheet({ onClose, id, kind: initialKind = 'account'
   };
 
   return (
-    <Sheet title={existing ? `${existing.name} szerkesztése` : isEnvelope ? 'Új boríték' : 'Új tárca'} onClose={onClose} tall>
+    <Sheet title={existing ? `${existing.name} szerkesztése` : `Új ${noun}`} onClose={onClose} tall>
       <div className="form">
-        {!existing && !isEnvelope && (
+        {!existing && !isGoal && (
           <Segmented small value={kind} onChange={setKind}
             options={[{ value: 'account', label: 'Bankszámla' }, { value: 'cash', label: 'Készpénz' }, { value: 'reserve', label: 'Tartalék' }]} />
         )}
-        <Field label="Név"><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={isEnvelope ? 'pl. Új laptop' : 'pl. Erste'} autoFocus={!existing} /></Field>
+        <Field label="Név"><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={isVault ? 'pl. Utazás' : isGoal ? 'pl. Új laptop' : 'pl. Erste'} autoFocus={!existing} /></Field>
         <Field label="Ikon">
           <div className="icon-grid">{ICONS.map((i) => <button type="button" key={i} className={icon === i ? 'on' : ''} onClick={() => setIcon(i)}>{i}</button>)}</div>
         </Field>
@@ -61,9 +64,9 @@ export default function WalletSheet({ onClose, id, kind: initialKind = 'account'
           <div className="color-grid">{COLORS.map((c) => <button type="button" key={c} className={color === c ? 'on' : ''} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />)}</div>
         </Field>
         {!existing && <Field label="Kezdőegyenleg"><AmountInput value={initialBalance} onChange={setInitialBalance} /></Field>}
-        {isEnvelope && (
+        {isGoal && (
           <>
-            <Field label="Célösszeg" hint="Üresen hagyva szabad gyűjtőboríték"><AmountInput value={targetAmount} onChange={setTargetAmount} /></Field>
+            <Field label="Célösszeg (opcionális)" hint={isVault ? 'Üresen hagyva cél nélküli széf' : 'Üresen hagyva szabad gyűjtőboríték'}><AmountInput value={targetAmount} onChange={setTargetAmount} /></Field>
             <Field label="Céldátum (opcionális)"><input className="input" type="date" value={targetDate || ''} onChange={(e) => setTargetDate(e.target.value)} /></Field>
             <label className="switch-row">
               <span>Kiemelt a Főoldalon</span>
@@ -71,7 +74,7 @@ export default function WalletSheet({ onClose, id, kind: initialKind = 'account'
             </label>
           </>
         )}
-        <Field label="Gyorsbeviteli kulcsszavak" hint="Vesszővel elválasztva, pl.: otp, bank">
+        <Field label="Gyorsbeviteli kulcsszavak" hint={isVault ? 'Vesszővel elválasztva. Gyorsbevitelben „széf <név>” is működik, pl.: 10000 revo > széf utazás' : 'Vesszővel elválasztva, pl.: otp, bank'}>
           <input className="input" value={keywords} onChange={(e) => setKeywords(e.target.value)} />
         </Field>
         {existing && (
@@ -82,7 +85,7 @@ export default function WalletSheet({ onClose, id, kind: initialKind = 'account'
             </button>
           </div>
         )}
-        <p className="muted small">{WALLET_KIND[kind]}{kind === 'account' || kind === 'cash' ? ' · beleszámít az azonnal elkölthető egyenlegbe' : ' · félretett pénz, nem számít a likvid egyenlegbe'}</p>
+        <p className="muted small">{WALLET_KIND[kind]}{isLiquidKind(kind) ? ' · beleszámít az azonnal elkölthető egyenlegbe' : ' · félretett pénz, nem számít a likvid egyenlegbe'}</p>
         <div className="form-actions sticky">
           <button className="btn primary grow" disabled={!name.trim() || busy} onClick={save}>Mentés</button>
         </div>

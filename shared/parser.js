@@ -8,10 +8,11 @@ import { depthOf, isActive } from './categories.js';
  *   "+4000 mama költős"        -> Bevétel 4000, Költős
  *   "10000 otp -> költős"      -> Átcsoportosítás OTP -> Költős
  *   "5000 otp > irattartó"     -> Átcsoportosítás OTP -> Irattartó
+ *   "8000 revo > széf utazás"  -> Átcsoportosítás Revolut -> Utazás széf
  *
  * @param {string} text
  * @param {object} ctx
- * @param {Array<{id:number,name:string,keywords?:string[],archived?:boolean}>} ctx.wallets
+ * @param {Array<{id:number,name:string,kind?:string,keywords?:string[],archived?:boolean}>} ctx.wallets
  * @param {Array<{id:number,name:string,kind:string,parentId?:number|null,keywords?:string[],archived?:boolean}>} [ctx.categories]
  * @param {Record<string, number>} [ctx.memory]  normalizált megnevezés -> kategória id (korábbi használat)
  */
@@ -33,6 +34,7 @@ export function parseQuickEntry(text, { wallets = [], categories = [], memory = 
 
   const walletIndex = buildWalletIndex(wallets.filter((w) => !w.archived));
   const isTransfer = rawTokens.includes('>');
+  const hasVaults = wallets.some((w) => w.kind === 'vault' && !w.archived);
 
   const nameTokens = [];
   const leftWallets = [];
@@ -77,6 +79,8 @@ export function parseQuickEntry(text, { wallets = [], categories = [], memory = 
       (side === 'left' ? leftWallets : rightWallets).push(walletIndex.get(one));
       continue;
     }
+    // A „széf” jelzőszó önmagában nem kerül a megnevezésbe (pl. „széf új laptop”)
+    if (hasVaults && VAULT_WORDS.has(one)) continue;
     nameTokens.push(tok);
   }
 
@@ -103,6 +107,8 @@ export function parseQuickEntry(text, { wallets = [], categories = [], memory = 
   return result;
 }
 
+const VAULT_WORDS = new Set(['szef', 'szefbe', 'szefbol']);
+
 function buildWalletIndex(wallets) {
   const idx = new Map();
   // 1. kör: explicit kulcsszavak és teljes név (ezek az erősebbek)
@@ -119,6 +125,20 @@ function buildWalletIndex(wallets) {
     for (const word of normalize(w.name).split(' ')) {
       if (word.length >= 3 && !idx.has(word)) idx.set(word, w.id);
     }
+  }
+  // 3. kör: széfek „széf <név>” alakban is („10000 revo > széf utazás”);
+  // ha csak egy széf van, maga a „széf” szó is rá mutat
+  const vaults = wallets.filter((w) => w.kind === 'vault');
+  for (const w of vaults) {
+    const names = [normalize(w.name), ...(w.keywords || []).map(normalize)].filter(Boolean);
+    for (const n of names) {
+      for (const prefix of VAULT_WORDS) {
+        if (!idx.has(`${prefix} ${n}`)) idx.set(`${prefix} ${n}`, w.id);
+      }
+    }
+  }
+  if (vaults.length === 1) {
+    for (const k of VAULT_WORDS) if (!idx.has(k)) idx.set(k, vaults[0].id);
   }
   return idx;
 }

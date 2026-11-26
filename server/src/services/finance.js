@@ -1,9 +1,10 @@
 import { normalize } from '@budget/shared/text';
 import { TZ, all } from '../db.js';
+import { WALLET_KINDS, LIQUID_KINDS, SAVED_KINDS, DEFAULT_WALLET_ICON } from '@budget/shared/wallets';
 import { bad, notFound } from './errors.js';
 
-const LIQUID = new Set(['account', 'cash']);
-const SAVED = new Set(['reserve', 'envelope']);
+const LIQUID = new Set(LIQUID_KINDS);
+const SAVED = new Set(SAVED_KINDS);
 
 // ───────────────────────── Beállítások ─────────────────────────
 
@@ -104,8 +105,6 @@ export function summarize(wallets) {
   return { liquid, saved, total: liquid + saved };
 }
 
-const WALLET_KINDS = ['account', 'cash', 'reserve', 'envelope'];
-
 export async function createWallet(db, input) {
   const name = String(input.name || '').trim();
   if (!name) throw bad('Adj nevet a tárcának');
@@ -157,7 +156,7 @@ export async function updateWallet(db, id, input) {
 }
 
 function defaultIcon(kind) {
-  return { account: '🏦', cash: '👛', reserve: '🗂️', envelope: '✉️' }[kind] || '💳';
+  return DEFAULT_WALLET_ICON[kind] || '💳';
 }
 
 function cleanKeywords(v, name) {
@@ -346,7 +345,9 @@ export async function listTransactions(db, f = {}) {
 
   if (f.status) add('t.status = ?', f.status);
   if (f.q) add(`(t.name ILIKE ? OR t.note ILIKE ?)`, `%${f.q}%`);
-  if (f.wallet === 'envelopes') where.push(`(t.wallet_id IN (SELECT id FROM wallets WHERE kind = 'envelope') OR t.to_wallet_id IN (SELECT id FROM wallets WHERE kind = 'envelope'))`);
+  // Csoportszűrők: az összes boríték / széf egyszerre
+  const groupKind = { envelopes: 'envelope', vaults: 'vault' }[f.wallet];
+  if (groupKind) add(`(t.wallet_id IN (SELECT id FROM wallets WHERE kind = ?) OR t.to_wallet_id IN (SELECT id FROM wallets WHERE kind = ?))`, groupKind);
   else if (f.wallet) add('(t.wallet_id = ? OR t.to_wallet_id = ?)', int(f.wallet));
   if (f.type) add('t.type = ?', f.type);
   // A kategória-szűrő az összes alkategóriát is tartalmazza
