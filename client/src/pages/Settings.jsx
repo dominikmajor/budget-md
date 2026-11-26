@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { ChevronUp, ChevronDown, Pencil, Archive, ArchiveRestore, Plus, Trash2, Download, Upload, KeyRound, ChevronRight, CornerDownRight } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronUp, ChevronDown, Pencil, Archive, ArchiveRestore, Plus, Trash2, Download, Upload, KeyRound, ScanFace, ChevronRight, CornerDownRight } from 'lucide-react';
 import { childrenMap, descendantIds, flattenTree } from '@budget/shared/categories';
 import { useApp } from '../store.jsx';
 import { api } from '../api.js';
@@ -7,6 +7,7 @@ import Sheet from '../components/Sheet.jsx';
 import PinPad from '../components/PinPad.jsx';
 import { AmountInput, Card, Field, Segmented, WalletPicker, CategoryPicker } from '../components/ui.jsx';
 import { formatHUF, downloadUrl } from '../lib/util.js';
+import { biometricLabel, biometricRegister, isCancel, platformAuthAvailable } from '../lib/biometric.js';
 
 const EMOJIS = ['🏷️', '💻', '🎨', '📷', '🧾', '🍝', '🍦', '🧴', '🎓', '🚌', '🎉', '📦', '💼', '🎁', '✨', '☕', '🍺', '🛒', '👕', '💊', '🏋️', '📚', '🎮', '🏠', '📱', '💡', '🐶', '✂️', '🚕'];
 const COLORS = ['#f97316', '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#eab308', '#64748b', '#22c55e', '#f43f5e', '#0ea5e9', '#84cc16', '#a855f7'];
@@ -17,7 +18,7 @@ export default function Settings() {
     ['categories', '🏷️', 'Kategóriák kezelése', 'Kategóriák és alkategóriák tetszőleges mélységben'],
     ['templates', '⚡', 'Gyorsrögzítő sablonok', '1 kattintásos tételek a + gombnál'],
     ['reserve', '🗂️', 'Irattartó célszint', 'Figyelmeztetés a Főoldalon, ha ez alá csökken'],
-    ['security', '🔐', 'Biztonság', 'PIN-kód, automatikus zárolás'],
+    ['security', '🔐', 'Biztonság', 'PIN-kód, Face ID, automatikus zárolás'],
     ['data', '💾', 'Adatok exportálása és mentés', 'CSV, JSON mentés és visszatöltés'],
   ];
   return (
@@ -303,6 +304,7 @@ function SecuritySheet({ onClose }) {
       ) : (
         <div className="form">
           <button className="btn ghost full" onClick={() => setStep('old')}><KeyRound size={16} /> PIN-kód módosítása</button>
+          <BiometricSettings />
           <Field label="Automatikus zárolás" hint="Ennyi inaktivitás vagy háttérben töltött idő után újra PIN-t kér">
             <div className="picker">
               {options.map(([v, l]) => (
@@ -314,6 +316,69 @@ function SecuritySheet({ onClose }) {
         </div>
       )}
     </Sheet>
+  );
+}
+
+/** Face ID / Touch ID / Windows Hello: eszközönként kapcsolható be, a PIN mindig tartalék marad. */
+function BiometricSettings() {
+  const { notify } = useApp();
+  const [available, setAvailable] = useState(null);
+  const [creds, setCreds] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const label = biometricLabel();
+
+  const load = () => api.get('/auth/webauthn/credentials').then(setCreds).catch(() => setCreds([]));
+  useEffect(() => {
+    platformAuthAvailable().then(setAvailable);
+    load();
+  }, []);
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      await biometricRegister();
+      notify(`${label} bekapcsolva ezen az eszközön`);
+      await load();
+    } catch (e) {
+      if (e?.name === 'InvalidStateError') notify('Ez az eszköz már be van állítva');
+      else if (!isCancel(e)) notify(e.message, 'error');
+    } finally { setBusy(false); }
+  };
+  const remove = async (c) => {
+    try {
+      await api.del(`/auth/webauthn/credentials/${encodeURIComponent(c.id)}`);
+      notify('Eszköz eltávolítva');
+      await load();
+    } catch (e) { notify(e.message, 'error'); }
+  };
+
+  const date = (d) => new Date(d).toLocaleDateString('hu-HU');
+  return (
+    <Field group label="Face ID / biometrikus belépés"
+      hint={available === false
+        ? 'Ezen az eszközön vagy böngészőben nem érhető el (HTTPS és beépített Face ID / Touch ID / Windows Hello kell).'
+        : 'Belépéskor a PIN helyett az arcod vagy ujjlenyomatod azonosít. A PIN-kód tartaléknak megmarad.'}>
+      <div className="stack">
+        {creds?.length > 0 && (
+          <div className="edit-list">
+            {creds.map((c) => (
+              <div key={c.id} className="edit-row">
+                <span className="rank-icon"><ScanFace size={16} /></span>
+                <span className="grow">{c.name}<small className="muted"> · hozzáadva {date(c.createdAt)}{c.lastUsedAt ? ` · utoljára ${date(c.lastUsedAt)}` : ''}</small></span>
+                <div className="row-actions">
+                  <button className="icon-btn danger-text" onClick={() => remove(c)} aria-label="Eltávolítás"><Trash2 size={15} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {available && (
+          <button className="btn ghost full" disabled={busy} onClick={enable}>
+            <ScanFace size={16} /> {label} bekapcsolása ezen az eszközön
+          </button>
+        )}
+      </div>
+    </Field>
   );
 }
 

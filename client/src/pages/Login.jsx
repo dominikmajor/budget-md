@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ScanFace } from 'lucide-react';
 import PinPad from '../components/PinPad.jsx';
 import { BrandMark, Wordmark } from '../components/Brand.jsx';
 import { api } from '../api.js';
 import { haptic } from '../lib/util.js';
+import { biometricLabel, biometricLogin, isCancel, platformAuthAvailable } from '../lib/biometric.js';
 
 export default function Login({ status, onSuccess, onStatus }) {
   const setup = !status.hasPin;
@@ -13,6 +15,38 @@ export default function Login({ status, onSuccess, onStatus }) {
   const [message, setMessage] = useState('');
   const [lockedUntil, setLockedUntil] = useState(status.lockedUntil ? new Date(status.lockedUntil) : null);
   const [now, setNow] = useState(Date.now());
+  const [bio, setBio] = useState(false); // Face ID elérhető ezen az eszközön és be van állítva
+  const [bioBusy, setBioBusy] = useState(false);
+  const autoTried = useRef(false);
+
+  const tryBiometric = async () => {
+    if (bioBusy) return;
+    setBioBusy(true);
+    try {
+      await biometricLogin();
+      onSuccess(false);
+    } catch (e) {
+      if (!isCancel(e)) fail(e.message || `${biometricLabel()} sikertelen`);
+    } finally {
+      setBioBusy(false);
+    }
+  };
+
+  // Face ID: ha be van kapcsolva, a képernyő megnyitásakor magától felajánlja; a PIN marad tartaléknak
+  useEffect(() => {
+    if (setup || !status.webauthn) return;
+    let alive = true;
+    platformAuthAvailable().then((ok) => {
+      if (!alive || !ok) return;
+      setBio(true);
+      if (!autoTried.current && !status.lockedUntil && document.visibilityState === 'visible') {
+        autoTried.current = true;
+        tryBiometric();
+      }
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!lockedUntil) return;
@@ -72,7 +106,13 @@ export default function Login({ status, onSuccess, onStatus }) {
           </div>
         )}
       </div>
-      <PinPad value={pin} length={length} onChange={setPin} disabled={wait > 0} error={error} />
+      <PinPad value={pin} length={length} onChange={setPin} disabled={wait > 0} error={error}
+        extra={bio ? (
+          <button type="button" className="pin-key ghost" onClick={tryBiometric} disabled={bioBusy}
+            aria-label={biometricLabel()} title={biometricLabel()}>
+            <ScanFace size={28} />
+          </button>
+        ) : null} />
     </div>
   );
 }

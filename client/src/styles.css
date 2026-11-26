@@ -354,6 +354,7 @@ textarea.input { height: auto; padding: 12px 14px; resize: vertical; }
   min-height: 100dvh; max-width: 420px; margin: 0 auto; position: relative; overflow: hidden;
   display: flex; flex-direction: column; justify-content: space-between;
   padding: calc(56px + var(--safe-t)) 28px calc(32px + var(--safe-b));
+  gap: 24px;
 }
 .onboarding { justify-content: flex-start; gap: 16px; overflow: visible; }
 .onboarding h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; position: relative; }
@@ -364,7 +365,7 @@ textarea.input { height: auto; padding: 12px 14px; resize: vertical; }
 .login-brand .wordmark { font-size: 17px; }
 .login-icon { display: none; }
 .login-head h1 { font-size: 24px; font-weight: 650; }
-.login-msg { color: var(--text-3); min-height: 21px; }
+.login-msg { color: var(--text-3); min-height: 21px; margin-bottom: 24px; }
 .login-msg.err { color: var(--neg); }
 .login-head .seg { margin-top: 10px; min-width: 200px; }
 .pin { display: flex; flex-direction: column; align-items: center; gap: 40px; }
@@ -381,6 +382,21 @@ textarea.input { height: auto; padding: 12px 14px; resize: vertical; }
 .pin-key:active:not(:disabled) { background: var(--surface-3); transform: scale(0.94); }
 .pin-key.ghost { background: none; color: var(--text-2); }
 .shake { animation: shake 0.4s; }
+/* Alacsony telefonképernyő (pl. Safari eszköztárakkal): kompaktabb PIN képernyő, hogy minden kiférjen */
+@media (max-height: 760px) {
+  .login { padding-top: calc(28px + var(--safe-t)); padding-bottom: calc(20px + var(--safe-b)); }
+  .login-brand { margin-bottom: 8px; gap: 8px; }
+  .login-brand .brand-mark { width: 48px; height: 48px; }
+  .login-msg { margin-bottom: 16px; }
+  .pin { gap: 28px; }
+  .pin-grid { gap: 12px 28px; }
+  .pin-key { width: 72px; height: 72px; }
+}
+@media (max-height: 620px) {
+  .login-brand .brand-mark { width: 40px; height: 40px; }
+  .pin { gap: 20px; }
+  .pin-key { width: 64px; height: 64px; font-size: 26px; }
+}
 
 .splash { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
 .splash-logo { width: 52px; height: 52px; animation: pulse 1.2s infinite ease-in-out; }

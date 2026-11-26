@@ -35,7 +35,7 @@ export default function PinPad({ value, length, onChange, disabled, error, extra
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
           <button key={d} type="button" className="pin-key" onClick={() => press(d)} disabled={disabled}>{d}</button>
         ))}
-        <div className="pin-key ghost">{extra}</div>
+        {extra || <div className="pin-key ghost" />}
         <button type="button" className="pin-key" onClick={() => press('0')} disabled={disabled}>0</button>
         <button type="button" className="pin-key ghost" onClick={back} aria-label="Törlés" disabled={disabled}>
           <Delete size={26} />
