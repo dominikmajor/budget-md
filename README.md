@@ -42,7 +42,7 @@ npm run verify    # csak a 4. fejezet példája
 A `verify` egy **ideiglenes sémában, egyetlen tranzakcióban** játssza végig a teljes forgatókönyvet
 (kezdőállapot → mama 4 000 → fagyi piszkozat → DM blokkal → munka 16 000 → Irattartó kivét → két átcsoportosítás),
 ellenőrzi az összes egyenleget, a statisztikát, a kategóriafa műveleteit (mozgatás, törlés áthelyezéssel), a mentés/visszatöltést és a régi adatbázis migrációját, majd **ROLLBACK** – a valódi adataidhoz nem nyúl,
-akár a Vercel adatbázison is biztonságosan futtatható. Várt zárás: Likvid 61 000 · Félretett 90 000 · Teljes 151 000 Ft.
+akár a Vercel adatbázison is biztonságosan futtatható. Várt zárás: Likvid 91 000 · Félretett 60 000 · Teljes 151 000 Ft.
 
 ## Éles futtatás egy szerveren
 
@@ -75,7 +75,7 @@ NODE_ENV=production npm start   # az API kiszolgálja a buildelt frontendet is a
 ## Pénzügyi logika
 
 - Az egyenleg mindig a tranzakciókból számolódik (`wallet_balances` nézet): kezdőegyenleg + bevételek − kiadások ± átcsoportosítások. Szerkesztés vagy törlés után így nincs mit „visszaírni”, mindig pontos.
-- **Likvid** = bankszámla/digitális + készpénz zseb típusú tárcák; **Félretett** = tartalék (Irattartó) + borítékok.
+- **Likvid** = bankszámla/digitális + készpénz zseb + tartalék (Irattartó) típusú tárcák; **Félretett** = borítékok + széfek.
 - Átcsoportosítás nem számít a bevétel/kiadás statisztikába; a korrekciós tételek sem.
 - Piszkozat: ha van tárcája, már lefoglalja az összeget; ha nincs, csak jóváhagyáskor hat. A statisztikába csak véglegesítés után kerül.
 

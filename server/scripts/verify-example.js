@@ -80,8 +80,8 @@ try {
   console.log('\nKezdőállapot');
   {
     const s = await state();
-    check('Likvid 60 000 | Félretett 80 000 | Teljes 140 000', () =>
-      assert.deepEqual(s.summary, { liquid: 60000, saved: 80000, total: 140000 }));
+    check('Likvid 90 000 (Irattartóval) | Félretett 50 000 | Teljes 140 000', () =>
+      assert.deepEqual(s.summary, { liquid: 90000, saved: 50000, total: 140000 }));
   }
 
   console.log('\n1. Mamától 4 000 Ft kp — gyorsbevitel: "+4000 mama költős"');
@@ -96,7 +96,7 @@ try {
     const b = await balances();
     const s = await state();
     check('Költős: 3 000 → 7 000', () => assert.equal(b['Költős'], 7000));
-    check('Likvid egyenleg 64 000', () => assert.equal(s.summary.liquid, 64000));
+    check('Likvid egyenleg 94 000', () => assert.equal(s.summary.liquid, 94000));
   }
 
   console.log('\n2. Fagyi 1 500 — napközben piszkozat "fagyi 1500", este rendszerezve');
@@ -148,7 +148,7 @@ try {
     });
     const s = await state();
     check('OTP: 45 000 → 61 000', () => assert.equal(s.wallets.find((w) => w.name === 'OTP Számla').balance, 61000));
-    check('Likvid egyenleg 76 000', () => assert.equal(s.summary.liquid, 76000));
+    check('Likvid egyenleg 106 000', () => assert.equal(s.summary.liquid, 106000));
   }
 
   console.log('\n5. Kivét az Irattartóból (-5 000) váratlan kp-s kiadásra');
@@ -190,8 +190,8 @@ try {
     const b = Object.fromEntries(s.wallets.map((w) => [w.name, w.balance]));
     check('OTP 46 000 | Revolut 9 500 | Költős 5 500 | Irattartó 30 000 | Nyaralás 60 000', () =>
       assert.deepEqual(b, { 'OTP Számla': 46000, Revolut: 9500, 'Költős': 5500, 'Irattartó': 30000, 'Nyaralás': 60000 }));
-    check('Likvid 61 000 | Félretett 90 000 | Teljes 151 000', () =>
-      assert.deepEqual(s.summary, { liquid: 61000, saved: 90000, total: 151000 }));
+    check('Likvid 91 000 (Irattartóval) | Félretett 60 000 | Teljes 151 000', () =>
+      assert.deepEqual(s.summary, { liquid: 91000, saved: 60000, total: 151000 }));
     const st = await getStats(db, today());
     check(`Statisztika: bevétel ${formatHUF(st.totals.income)}, kiadás ${formatHUF(st.totals.expense)} (átcsoportosítás nélkül)`, () => {
       assert.equal(st.totals.income, 20000);

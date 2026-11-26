@@ -11,11 +11,11 @@
  */
 export const WALLET_KINDS = ['account', 'cash', 'reserve', 'envelope', 'vault'];
 
-/** Azonnal elkölthető pénz („Likvid”). */
-export const LIQUID_KINDS = ['account', 'cash'];
+/** Azonnal elkölthető pénz („Likvid”) – az Irattartó (tartalék) is ide tartozik. */
+export const LIQUID_KINDS = ['account', 'cash', 'reserve'];
 
 /** Félretett pénz („Félretett”) – nem számít a likvid egyenlegbe. */
-export const SAVED_KINDS = ['reserve', 'envelope', 'vault'];
+export const SAVED_KINDS = ['envelope', 'vault'];
 
 /** Célösszeges, több elemből álló gyűjtők (borítékok, széfek): saját szekció, haladásjelző. */
 export const GOAL_KINDS = ['envelope', 'vault'];
