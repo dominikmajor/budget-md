@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, FolderInput, Banknote, PiggyBank } from 'lucide-react';
+import { ArrowDown, FolderInput, Banknote, PiggyBank, Lock } from 'lucide-react';
 import Sheet from './Sheet.jsx';
 import { AmountInput, Field, WalletPicker } from './ui.jsx';
 import { useApp } from '../store.jsx';
 import { api } from '../api.js';
-import { formatHUF } from '../lib/util.js';
+import { formatHUF, mainWallet, vaultSource } from '../lib/util.js';
 
 /** Átcsoportosítási panel gyors-forgatókönyvekkel. */
 export default function TransferSheet({ onClose, from, to, amount: initialAmount, note: initialNote }) {
@@ -17,9 +17,11 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
 
   const find = (kind) => state.wallets.filter((w) => w.kind === kind && !w.archived);
   const reserve = find('reserve')[0];
-  const otp = state.wallets.find((w) => w.keywords?.includes('otp') && !w.archived) || find('account')[0];
+  const otp = mainWallet(state.wallets);
   const cash = find('cash')[0];
   const envelopes = find('envelope');
+  const vaults = find('vault');
+  const revo = vaultSource(state.wallets);
   const fromWallet = state.wallets.find((w) => w.id === walletId);
 
   const scenarios = useMemo(() => {
@@ -45,8 +47,14 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
         apply: () => { setWalletId(otp?.id ?? null); setToWalletId(envelopes[0].id); setNote('Félretétel'); },
       });
     }
+    if (vaults.length) {
+      list.push({
+        icon: <Lock size={18} />, label: 'Félretétel széfbe', sub: vaults.map((v) => v.name).join(', '),
+        apply: () => { setWalletId(revo?.id ?? null); setToWalletId(vaults[0].id); setNote('Széfbe'); },
+      });
+    }
     return list;
-  }, [state, reserve, otp, cash, envelopes]);
+  }, [state, reserve, otp, cash, envelopes, vaults, revo]);
 
   const submit = async () => {
     setBusy(true);

@@ -5,7 +5,7 @@ import { useApp } from '../store.jsx';
 import { api, qs } from '../api.js';
 import { CategoryPicker, Card, Chip, Empty, Money, Segmented } from '../components/ui.jsx';
 import TxRow from '../components/TxRow.jsx';
-import { dateKey, dayLabel, signedAmount, haptic } from '../lib/util.js';
+import { dateKey, dayLabel, signedAmount, haptic, isGoalKind } from '../lib/util.js';
 import { BP, useMediaQuery } from '../lib/useMediaQuery.js';
 
 export default function Transactions() {
@@ -78,7 +78,7 @@ function DraftCard({ tx }) {
   };
   const remove = () => mutate(() => api.del(`/transactions/${tx.id}`), 'Piszkozat törölve');
 
-  const wallets = state.wallets.filter((w) => !w.archived && w.kind !== 'envelope');
+  const wallets = state.wallets.filter((w) => !w.archived && !isGoalKind(w.kind));
 
   return (
     <div className="draft-wrap">
@@ -157,8 +157,9 @@ function Journal() {
     return [...map.entries()];
   }, [items]);
 
-  const activeWallets = state.wallets.filter((w) => !w.archived && w.kind !== 'envelope');
+  const activeWallets = state.wallets.filter((w) => !w.archived && !isGoalKind(w.kind));
   const hasEnvelopes = state.wallets.some((w) => w.kind === 'envelope');
+  const hasVaults = state.wallets.some((w) => w.kind === 'vault');
 
   return (
     <div className="journal">
@@ -180,6 +181,7 @@ function Journal() {
           <Chip key={w.id} active={filters.wallet === String(w.id)} color={w.color} onClick={() => setFilter('wallet', w.id)}>{w.name}</Chip>
         ))}
         {hasEnvelopes && <Chip active={filters.wallet === 'envelopes'} onClick={() => setFilter('wallet', 'envelopes')}>Borítékok</Chip>}
+        {hasVaults && <Chip active={filters.wallet === 'vaults'} onClick={() => setFilter('wallet', 'vaults')}>Széfek</Chip>}
       </div>
 
       {showFilters && (

@@ -53,6 +53,7 @@ try {
     const s = await state();
     return { wallets: s.wallets, categories: s.categories, memory: s.memory, s };
   };
+  const idIn = (s, name) => s.wallets.find((w) => w.name === name).id;
   const wid = async (name) => (await state()).wallets.find((w) => w.name === name).id;
   const cid = async (name, kind) => (await state()).categories.find((c) => c.name === name && c.kind === kind).id;
 
@@ -255,6 +256,50 @@ try {
     await expectFail('A rendszer-kategória nem törölhető', () => F.deleteCategory(db, s.categories.find((c) => c.isSystem).id, { moveTo: 'none' }), /rendszer/);
   }
 
+  console.log('\nSzéfek (Revolut Vaults) — "8000 revo > széf utazás"');
+  {
+    const before = await state();
+    const vaultId = await F.createWallet(db, { name: 'Utazás', kind: 'vault', targetAmount: 200000 });
+    let s = await state();
+    const vault = s.wallets.find((w) => w.id === vaultId);
+    check('Új széf: típus, alapértelmezett ikon és kulcsszó, nem likvid', () => {
+      assert.equal(vault.kind, 'vault');
+      assert.equal(vault.icon, '🔐');
+      assert.deepEqual(vault.keywords, ['utazas']);
+      assert.equal(vault.liquid, false);
+    });
+    const p = parseQuickEntry('8000 revo > széf utazás', await ctx());
+    check('Gyorsbevitel: Revolut → Utazás széf', () =>
+      assert.deepEqual([p.type, p.amount, p.walletId, p.toWalletId, p.valid], ['transfer', 8000, idIn(before, 'Revolut'), vaultId, true]));
+    await F.createTransaction(db, p);
+    s = await state();
+    const v = s.wallets.find((w) => w.id === vaultId);
+    check('Széf 8 000 Ft, 4% a 200 000 Ft-os célból', () => {
+      assert.equal(v.balance, 8000);
+      assert.equal(Math.round((v.balance / v.targetAmount) * 100), 4);
+    });
+    check('A széf a Félretettbe számít: Likvid −8 000, Félretett +8 000, Teljes változatlan', () => {
+      assert.equal(s.summary.liquid, before.summary.liquid - 8000);
+      assert.equal(s.summary.saved, before.summary.saved + 8000);
+      assert.equal(s.summary.total, before.summary.total);
+    });
+    const vt = await F.listTransactions(db, { wallet: 'vaults' });
+    const et = await F.listTransactions(db, { wallet: 'envelopes' });
+    check('„Széfek” szűrő csak a széf mozgásait mutatja', () => {
+      assert.equal(vt.length, 1);
+      assert.equal(vt[0].toWalletId, vaultId);
+      assert.equal(et.some((t) => t.toWalletId === vaultId), false);
+    });
+    await db.query('SAVEPOINT v');
+    try {
+      await F.createWallet(db, { name: 'Rossz', kind: 'safe' });
+      failures++; console.log('  ❌ Érvénytelen tárcatípus elutasítva\n     nem dobott hibát');
+    } catch (e) {
+      await db.query('ROLLBACK TO SAVEPOINT v');
+      check('Érvénytelen tárcatípus elutasítva', () => assert.match(e.message, /tárcatípus/));
+    }
+  }
+
   console.log('\nMentés és visszatöltés');
   {
     const before = await state();
@@ -264,6 +309,10 @@ try {
     check('JSON mentés → visszatöltés után azonosak az egyenlegek és a kategóriafa', () => {
       assert.deepEqual(after.summary, before.summary);
       assert.deepEqual(after.categories.map((c) => [c.id, c.parentId, c.name]), before.categories.map((c) => [c.id, c.parentId, c.name]));
+    });
+    check('A széf a mentés után is széf, ugyanazzal az egyenleggel és céllal', () => {
+      const pick = (st) => st.wallets.filter((w) => w.kind === 'vault').map((w) => [w.name, w.balance, w.targetAmount]);
+      assert.deepEqual(pick(after), [['Utazás', 8000, 200000]]);
     });
     const old = upgradeBackup({
       app: 'budget-app', version: 1,
@@ -305,6 +354,9 @@ try {
     check('A projekthez rendelt tétel a Side-hustle › Korrepetálás kategóriába került', () => assert.deepEqual([m.parent, m.name], ['Side-hustle', 'Korrepetálás']));
     check('A címkék a megjegyzés végére kerültek', () => assert.equal(m.note, 'Matek\n#egyetem #matek'));
     check('A projektek és címkék táblái megszűntek', () => assert.deepEqual([gone.rows[0].p, gone.rows[0].t], [null, null]));
+    await db.query(await fs.readFile(new URL('004_vaults.sql', dir), 'utf8'));
+    const { rows: [vr] } = await db.query(`INSERT INTO wallets (name, kind) VALUES ('Revolut széf', 'vault') RETURNING kind`);
+    check('004: meglévő adatbázison is létrehozható széf típusú tárca', () => assert.equal(vr.kind, 'vault'));
   }
 
   await db.query('ROLLBACK');

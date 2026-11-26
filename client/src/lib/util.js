@@ -11,7 +11,19 @@ export const WALLET_KIND = {
   cash: 'Készpénz zseb',
   reserve: 'Tartalék',
   envelope: 'Boríték',
+  vault: 'Széf',
 };
+
+export { isGoalKind, isLiquidKind, isSavedKind, GOAL_KINDS } from '@budget/shared/wallets';
+
+/** Az alapértelmezett likvid tárca (OTP vagy az első bankszámla). */
+export const mainWallet = (wallets = []) =>
+  wallets.find((w) => w.keywords?.includes('otp') && !w.archived) || wallets.find((w) => w.kind === 'account' && !w.archived);
+
+/** Széfek forrása: a Revolut tárca, ha van, különben a fő tárca. */
+export const vaultSource = (wallets = []) =>
+  wallets.find((w) => w.kind === 'account' && !w.archived && (w.keywords?.some((k) => k.startsWith('revo')) || /revolut/i.test(w.name)))
+  || mainWallet(wallets);
 
 export const byId = (list = []) => Object.fromEntries(list.map((x) => [x.id, x]));
 
