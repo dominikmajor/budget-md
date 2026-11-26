@@ -114,7 +114,7 @@ export async function createWallet(db, input) {
     [
       name,
       input.kind,
-      input.icon || defaultIcon(input.kind),
+      input.icon ? cleanIcon(input.icon) : defaultIcon(input.kind),
       input.color || '#7c5cff',
       int(input.initialBalance) || 0,
       int(input.targetAmount) || null,
@@ -129,7 +129,7 @@ export async function createWallet(db, input) {
 export async function updateWallet(db, id, input) {
   const fields = {
     name: (v) => { const s = String(v).trim(); if (!s) throw bad('Adj nevet a tárcának'); return s; },
-    icon: String,
+    icon: cleanIcon,
     color: String,
     targetAmount: (v) => int(v) || null,
     targetDate: (v) => v || null,

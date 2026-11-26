@@ -312,6 +312,9 @@ try {
       assert.equal(vt[0].toWalletId, vaultId);
       assert.equal(et.some((t) => t.toWalletId === vaultId), false);
     });
+    await F.updateWallet(db, vaultId, { icon: '🏝️' });
+    const iconNow = (await state()).wallets.find((w) => w.id === vaultId).icon;
+    check('Széf ikonja átírható tetszőleges emojira (🏝️)', () => assert.equal(iconNow, '🏝️'));
     await db.query('SAVEPOINT v');
     try {
       await F.createWallet(db, { name: 'Rossz', kind: 'safe' });

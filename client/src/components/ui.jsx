@@ -163,3 +163,30 @@ export function SectionTitle({ children, action }) {
     </div>
   );
 }
+
+export const EMOJI_HINT = 'Írj be egy tetszőleges emojit – mobilon a billentyűzet emoji-gombjával, Macen Ctrl+Cmd+Szóköz, Windowson Win+.';
+
+const isEmoji = (g) => /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(g);
+const graphemes = (str) => {
+  try { return [...new Intl.Segmenter('hu', { granularity: 'grapheme' }).segment(str)].map((x) => x.segment); } catch { return [...str]; }
+};
+
+/** Egyetlen, szabadon beírt emoji: a beírt szövegből az utolsó emojit tartja meg. */
+export function EmojiInput({ value, onChange, label = 'Ikon (emoji)' }) {
+  const [warn, setWarn] = useState(false);
+  const change = (text) => {
+    const emojis = graphemes(text).filter(isEmoji);
+    if (!text) { onChange(''); setWarn(false); return; }
+    if (!emojis.length) { setWarn(true); return; }
+    setWarn(false);
+    onChange(emojis[emojis.length - 1]);
+  };
+  return (
+    <div className="emoji-input">
+      <span className="emoji-preview" aria-hidden="true">{value || '?'}</span>
+      <input className="input" value={value} onChange={(e) => change(e.target.value)} placeholder="pl. 🍕" inputMode="text"
+        autoComplete="off" aria-label={label} />
+      {warn && <span className="field-hint warn">Csak emoji lehet az ikon.</span>}
+    </div>
+  );
+}

@@ -5,7 +5,7 @@ import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import Sheet from '../components/Sheet.jsx';
 import PinPad from '../components/PinPad.jsx';
-import { Card, Field, Segmented, CategoryPicker } from '../components/ui.jsx';
+import { Card, Field, Segmented, CategoryPicker, EmojiInput, EMOJI_HINT } from '../components/ui.jsx';
 import { downloadUrl } from '../lib/util.js';
 import { biometricLabel, biometricRegister, isCancel, platformAuthAvailable } from '../lib/biometric.js';
 
@@ -126,8 +126,8 @@ function CategoryEditor({ item, onClose, onDelete }) {
         <Field group label="Hová tartozik" hint="Válaszd a Főkategóriát, vagy bármelyik kategóriát (alkategóriát is), ami alá kerüljön">
           <CategoryPicker kind={item.kind} value={parentId} onChange={setParentId} exclude={exclude} noneLabel="⬆️ Főkategória" />
         </Field>
-        <Field label="Ikon (emoji)" hint="Írj be egy tetszőleges emojit – mobilon a billentyűzet emoji-gombjával, Macen Ctrl+Cmd+Szóköz, Windowson Win+.">
-          <EmojiInput value={icon} onChange={setIcon} />
+        <Field label="Ikon (emoji)" hint={EMOJI_HINT}>
+          <EmojiInput value={icon} onChange={setIcon} label="Kategória ikonja (emoji)" />
         </Field>
         <Field label="Szín"><div className="color-grid">{COLORS.map((c) => <button type="button" key={c} className={color === c ? 'on' : ''} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />)}</div></Field>
         <Field label="Gyorsbeviteli kulcsszavak" hint="Pl. „lidl, spar” – ezekre a szavakra automatikusan ez a kategória lesz kitöltve">
@@ -145,31 +145,6 @@ function CategoryEditor({ item, onClose, onDelete }) {
         )}
       </div>
     </Sheet>
-  );
-}
-
-const isEmoji = (g) => /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(g);
-const graphemes = (str) => {
-  try { return [...new Intl.Segmenter('hu', { granularity: 'grapheme' }).segment(str)].map((x) => x.segment); } catch { return [...str]; }
-};
-
-/** Egyetlen, szabadon beírt emoji: a beírt szövegből az utolsó emojit tartja meg. */
-function EmojiInput({ value, onChange }) {
-  const [warn, setWarn] = useState(false);
-  const change = (text) => {
-    const emojis = graphemes(text).filter(isEmoji);
-    if (!text) { onChange(''); setWarn(false); return; }
-    if (!emojis.length) { setWarn(true); return; }
-    setWarn(false);
-    onChange(emojis[emojis.length - 1]);
-  };
-  return (
-    <div className="emoji-input">
-      <span className="emoji-preview" aria-hidden="true">{value || '?'}</span>
-      <input className="input" value={value} onChange={(e) => change(e.target.value)} placeholder="pl. 🍕" inputMode="text"
-        autoComplete="off" aria-label="Kategória ikonja (emoji)" />
-      {warn && <span className="field-hint warn">Csak emoji lehet az ikon.</span>}
-    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Archive, ArchiveRestore, Scale } from 'lucide-react';
 import Sheet from './Sheet.jsx';
-import { AmountInput, Field, Segmented } from './ui.jsx';
+import { AmountInput, EmojiInput, EMOJI_HINT, Field, Segmented } from './ui.jsx';
 import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import { formatHUF, WALLET_KIND, isGoalKind, isLiquidKind } from '../lib/util.js';
@@ -57,9 +57,15 @@ export default function WalletSheet({ onClose, id, kind: initialKind = 'account'
             options={[{ value: 'account', label: 'Bankszámla' }, { value: 'cash', label: 'Készpénz' }, { value: 'reserve', label: 'Tartalék' }]} />
         )}
         <Field label="Név"><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={isVault ? 'pl. Utazás' : isGoal ? 'pl. Új laptop' : 'pl. Erste'} autoFocus={!existing} /></Field>
+        {isGoal ? (
+          <Field label="Ikon (emoji)" hint={EMOJI_HINT}>
+            <EmojiInput value={icon} onChange={setIcon} label={`${noun[0].toUpperCase()}${noun.slice(1)} ikonja (emoji)`} />
+          </Field>
+        ) : (
         <Field label="Ikon">
           <div className="icon-grid">{ICONS.map((i) => <button type="button" key={i} className={icon === i ? 'on' : ''} onClick={() => setIcon(i)}>{i}</button>)}</div>
         </Field>
+        )}
         <Field label="Szín">
           <div className="color-grid">{COLORS.map((c) => <button type="button" key={c} className={color === c ? 'on' : ''} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />)}</div>
         </Field>
@@ -87,7 +93,7 @@ export default function WalletSheet({ onClose, id, kind: initialKind = 'account'
         )}
         <p className="muted small">{WALLET_KIND[kind]}{isLiquidKind(kind) ? ' · beleszámít az azonnal elkölthető egyenlegbe' : ' · félretett pénz, nem számít a likvid egyenlegbe'}</p>
         <div className="form-actions sticky">
-          <button className="btn primary grow" disabled={!name.trim() || busy} onClick={save}>Mentés</button>
+          <button className="btn primary grow" disabled={!name.trim() || !icon || busy} onClick={save}>Mentés</button>
         </div>
       </div>
     </Sheet>
