@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeftRight, Plus, MoreHorizontal, ArrowDownLeft, ArrowUpRight, CheckCircle2, AlertTriangle, Scale, Minus } from 'lucide-react';
+import { ArrowLeftRight, Plus, MoreHorizontal, ArrowDownLeft, ArrowUpRight, Scale, Minus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store.jsx';
 import { Card, Money, Progress, SectionTitle, Empty } from '../components/ui.jsx';
@@ -70,9 +70,8 @@ export default function Wallets() {
 }
 
 function PocketCard({ w }) {
-  const { state, openSheet } = useApp();
+  const { openSheet } = useApp();
   const navigate = useNavigate();
-  const target = state.settings.reserveTarget;
 
   return (
     <Card className={`pocket-card ${w.archived ? 'archived' : ''}`} style={{ '--c': w.color }}>
@@ -84,18 +83,6 @@ function PocketCard({ w }) {
         </div>
         <Money value={w.balance} className="lg" />
       </div>
-
-      {w.kind === 'reserve' && (
-        <div className="reserve">
-          <Progress value={w.balance} max={target} tone={w.balance >= target ? 'green' : 'yellow'} />
-          <div className="row between small">
-            {w.balance >= target
-              ? <span className="pos"><CheckCircle2 size={14} /> Célszint teljesítve</span>
-              : <span className="warn"><AlertTriangle size={14} /> Hiányzik: {formatHUF(w.balance - target)}</span>}
-            <span className="muted">Cél: {formatHUF(target)}</span>
-          </div>
-        </div>
-      )}
 
       <div className="pocket-card-foot">
         <span className="muted small">E hónap:</span>

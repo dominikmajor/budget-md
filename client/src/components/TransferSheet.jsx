@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, FolderInput, Banknote, PiggyBank, Lock } from 'lucide-react';
+import { ArrowDown, Banknote, PiggyBank, Lock } from 'lucide-react';
 import Sheet from './Sheet.jsx';
 import { AmountInput, Field, WalletPicker } from './ui.jsx';
 import { useApp } from '../store.jsx';
@@ -16,7 +16,6 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
   const [busy, setBusy] = useState(false);
 
   const find = (kind) => state.wallets.filter((w) => w.kind === kind && !w.archived);
-  const reserve = find('reserve')[0];
   const otp = mainWallet(state.wallets);
   const cash = find('cash')[0];
   const envelopes = find('envelope');
@@ -26,15 +25,6 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
 
   const scenarios = useMemo(() => {
     const list = [];
-    if (reserve) {
-      const missing = state.settings.reserveTarget - reserve.balance;
-      list.push({
-        icon: <FolderInput size={18} />, label: `Irattartó feltöltése ${formatHUF(state.settings.reserveTarget)}-ra`,
-        sub: missing > 0 ? `${formatHUF(missing)} hiányzik` : 'Célszint teljesítve',
-        disabled: missing <= 0,
-        apply: () => { setWalletId(otp?.id ?? null); setToWalletId(reserve.id); setAmount(String(missing)); setNote('Irattartó pótlása'); },
-      });
-    }
     if (otp && cash) {
       list.push({
         icon: <Banknote size={18} />, label: 'Készpénz felvétel', sub: `${otp.name} → ${cash.name}`,
@@ -54,7 +44,7 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
       });
     }
     return list;
-  }, [state, reserve, otp, cash, envelopes, vaults, revo]);
+  }, [state, otp, cash, envelopes, vaults, revo]);
 
   const submit = async () => {
     setBusy(true);

@@ -1,7 +1,7 @@
 import { bad } from './errors.js';
 
 const TABLES = ['wallets', 'categories', 'transactions'];
-const SETTINGS_COLS = ['autolock_minutes', 'reserve_target'];
+const SETTINGS_COLS = ['autolock_minutes'];
 
 /** Teljes, visszaállítható mentés (a PIN hash nélkül). */
 export async function exportJson(db) {

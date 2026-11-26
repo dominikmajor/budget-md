@@ -41,7 +41,7 @@ npm run verify    # csak a 4. fejezet példája
 
 A `verify` egy **ideiglenes sémában, egyetlen tranzakcióban** játssza végig a teljes forgatókönyvet
 (kezdőállapot → mama 4 000 → fagyi piszkozat → DM blokkal → munka 16 000 → Irattartó kivét → két átcsoportosítás),
-ellenőrzi az összes egyenleget, a riasztásokat, a statisztikát, a kategóriafa műveleteit (mozgatás, törlés áthelyezéssel), a mentés/visszatöltést és a régi adatbázis migrációját, majd **ROLLBACK** – a valódi adataidhoz nem nyúl,
+ellenőrzi az összes egyenleget, a statisztikát, a kategóriafa műveleteit (mozgatás, törlés áthelyezéssel), a mentés/visszatöltést és a régi adatbázis migrációját, majd **ROLLBACK** – a valódi adataidhoz nem nyúl,
 akár a Vercel adatbázison is biztonságosan futtatható. Várt zárás: Likvid 61 000 · Félretett 90 000 · Teljes 151 000 Ft.
 
 ## Éles futtatás egy szerveren
@@ -56,12 +56,12 @@ NODE_ENV=production npm start   # az API kiszolgálja a buildelt frontendet is a
 | Oldal | Tartalom |
 |---|---|
 | **PIN képernyő** | 4/6 jegyű PIN, Face ID / Touch ID / Windows Hello belépés (passkey, automatikusan felajánlva, a PIN tartalék), automatikus beléptetés, rázkódás + piros pontok hibánál, 5 hiba után 30 mp várakozás (szerveroldalon), automatikus zárolás háttérbe kerülés / inaktivitás után |
-| **Főoldal** | Irattartó riasztás „Feltöltés 30k-ra” gombbal, piszkozat-emlékeztető, hero kártya (likvid / félretett / teljes vagyon), szem ikonos elrejtés, tárca-kártyák, kiemelt borítékok, utolsó 8 tétel |
+| **Főoldal** | Piszkozat-emlékeztető, hero kártya (likvid / félretett / teljes vagyon), szem ikonos elrejtés, tárca-kártyák, kiemelt borítékok, utolsó 8 tétel |
 | **Gyorsrögzítő (+)** | Szabadszöveges parser élő előnézettel (`fagyi 1500 költős`, `+4000 mama kp`), villám-piszkozat, részletes űrlap (kiadás / bevétel; lépcsőzetes kategóriaválasztó alkategóriákkal, dátum, megjegyzés, blokk fotó kamerából) |
 | **Tranzakciók** | Esti rendszerező (kártyán helyben tárca/kategória, zöld pipa vagy jobbra húzás, „Összes jóváhagyása”), napló keresővel és szűrőkkel (a kategória-szűrő az alkategóriák tételeit is mutatja), napi csoportosítás napi nettóval, részletnézet, szerkesztés/törlés pontos visszaszámolással |
-| **Tárcák** | Pénz mozgatása (átcsoportosítás tárcák, borítékok, széfek között) gyors-forgatókönyvekkel, havi be/ki forgalom, Irattartó célszint-csík, új tárca/boríték, archiválás, borítékok célösszeggel, céldátummal és javasolt heti félretétellel, Befizetés/Kivétel, egyenleg-igazítás (készpénz leltár → korrekciós tétel) |
+| **Tárcák** | Pénz mozgatása (átcsoportosítás tárcák, borítékok, széfek között) gyors-forgatókönyvekkel, havi be/ki forgalom, új tárca/boríték, archiválás, borítékok célösszeggel, céldátummal és javasolt heti félretétellel, Befizetés/Kivétel, egyenleg-igazítás (készpénz leltár → korrekciós tétel) |
 | **Statisztika** | Időszakválasztó, cash-flow oszlopdiagram (táblázat nézettel), bevételek és kiadások kategóriafa szerint (a főkategóriák összesítik az alkategóriákat, koppintással lefúrható), bevételi gyakoriság, kiadások fánkdiagramon előző időszakhoz mért változással |
-| **Beállítások** | Kategóriafa korlátlan mélységű alkategóriákkal (létrehozás, átnevezés, áthelyezés, sorrend, ikon, szín, archiválás, törlés, gyorsbeviteli kulcsszavak), Irattartó célösszeg, PIN-csere, Face ID bekapcsolása / eszközök eltávolítása, zárolási idő, CSV/JSON export, JSON visszatöltés |
+| **Beállítások** | Kategóriafa korlátlan mélységű alkategóriákkal (létrehozás, átnevezés, áthelyezés, sorrend, ikon, szín, archiválás, törlés, gyorsbeviteli kulcsszavak), PIN-csere, Face ID bekapcsolása / eszközök eltávolítása, zárolási idő, CSV/JSON export, JSON visszatöltés |
 
 ## Kategóriák
 
@@ -70,7 +70,7 @@ NODE_ENV=production npm start   # az API kiszolgálja a buildelt frontendet is a
 - Törlés: az alkategóriák egy szinttel feljebb lépnek. Ha tételek tartoznak a kategóriához, meg kell adni, hová kerüljenek (másik kategória vagy „Kategória nélkül”) – enélkül a szerver nem engedi a törlést.
 - A 003-as migráció a régi adatokat átalakítja: a projektek a „Side-hustle” kategória alkategóriái lettek (a tételeik oda kerültek), a #címkék a tételek megjegyzésének végére íródtak. Régi JSON mentés visszatöltésekor ugyanez automatikusan megtörténik.
 - A 006-os migráció a korábban előre feltöltött alapkategóriákat törli (a hozzájuk rendelt tételek „Kategória nélkül” maradnak, a saját kategóriák megmaradnak).
-- Az app tisztán nyilvántartó: nincs költési keret. Az egyetlen célszint az Irattartó minimuma (figyelmeztetés a Főoldalon).
+- Az app tisztán nyilvántartó: nincs költési keret és nincs Irattartó célszint vagy figyelmeztetés; az Irattartó egy sima tartalék-tárca.
 
 ## Pénzügyi logika
 

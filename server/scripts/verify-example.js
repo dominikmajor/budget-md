@@ -155,9 +155,9 @@ try {
   {
     await F.createTransaction(db, { type: 'expense', amount: 5000, walletId: await wid('Irattartó'), name: 'Váratlan kiadás' });
     const s = await state();
-    const alert = s.alerts.find((a) => a.type === 'reserve');
     check('Irattartó: 30 000 → 25 000', () => assert.equal(s.wallets.find((w) => w.name === 'Irattartó').balance, 25000));
-    check('Riasztás aktív: 5 000 Ft hiányzik a 30 000 Ft-os célhoz', () => assert.equal(alert?.missing, 5000));
+    check('Nincs Irattartó-figyelmeztetés (nincs célszint)', () => assert.equal(s.alerts.some((a) => a.type === 'reserve'), false));
+    check('A beállításokban nincs Irattartó célösszeg', () => assert.equal('reserveTarget' in s.settings, false));
   }
 
   console.log('\n6. Irattartó pótlása és félretétel — Tárcák › Pénz mozgatása: OTP → Irattartó 5 000, OTP → Nyaralás 10 000');
@@ -179,7 +179,6 @@ try {
     check('OTP: 61 000 → 46 000', () => assert.equal(b['OTP Számla'], 46000));
     check('Irattartó: 25 000 → 30 000', () => assert.equal(b['Irattartó'], 30000));
     check('Nyaralás: 50 000 → 60 000', () => assert.equal(b['Nyaralás'], 60000));
-    check('Irattartó riasztás eltűnt', () => assert.equal(s.alerts.some((a) => a.type === 'reserve'), false));
     check('Nyaralás boríték 20% (60 000 / 300 000)', () => assert.equal(Math.round((nyaralas.balance / nyaralas.targetAmount) * 100), 20));
     check('A havi kiadás nem változott az átcsoportosítástól', () =>
       assert.equal(statsAfter.totals.expense, statsBefore.totals.expense));

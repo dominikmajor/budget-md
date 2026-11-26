@@ -5,7 +5,7 @@ import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import Sheet from '../components/Sheet.jsx';
 import PinPad from '../components/PinPad.jsx';
-import { AmountInput, Card, Field, Segmented, CategoryPicker } from '../components/ui.jsx';
+import { Card, Field, Segmented, CategoryPicker } from '../components/ui.jsx';
 import { downloadUrl } from '../lib/util.js';
 import { biometricLabel, biometricRegister, isCancel, platformAuthAvailable } from '../lib/biometric.js';
 
@@ -15,7 +15,6 @@ export default function Settings() {
   const [open, setOpen] = useState(null);
   const sections = [
     ['categories', '🏷️', 'Kategóriák kezelése', 'Kategóriák és alkategóriák tetszőleges mélységben'],
-    ['reserve', '🗂️', 'Irattartó célszint', 'Figyelmeztetés a Főoldalon, ha ez alá csökken'],
     ['security', '🔐', 'Biztonság', 'PIN-kód, Face ID, automatikus zárolás'],
     ['data', '💾', 'Adatok exportálása és mentés', 'CSV, JSON mentés és visszatöltés'],
   ];
@@ -32,7 +31,6 @@ export default function Settings() {
       </Card>
       <p className="muted small center">budget.md · egyfelhasználós, PIN-védett · adataid a saját adatbázisodban</p>
       {open === 'categories' && <CategoriesSheet onClose={() => setOpen(null)} />}
-      {open === 'reserve' && <ReserveSheet onClose={() => setOpen(null)} />}
       {open === 'security' && <SecuritySheet onClose={() => setOpen(null)} />}
       {open === 'data' && <DataSheet onClose={() => setOpen(null)} />}
     </div>
@@ -210,24 +208,6 @@ function CategoryDelete({ item, onClose }) {
           <button className="btn ghost" onClick={onClose}>Mégse</button>
           <button className="btn danger grow" disabled={busy || target === undefined} onClick={remove}><Trash2 size={16} /> Törlés</button>
         </div>
-      </div>
-    </Sheet>
-  );
-}
-
-// ── Irattartó célszint
-function ReserveSheet({ onClose }) {
-  const { state, mutate } = useApp();
-  const [reserveTarget, setReserveTarget] = useState(String(state.settings.reserveTarget));
-  const save = async () => {
-    await mutate(() => api.put('/settings', { reserveTarget: Number(reserveTarget) }), 'Beállítások mentve');
-    onClose();
-  };
-  return (
-    <Sheet title="Irattartó célszint" onClose={onClose}>
-      <div className="form">
-        <Field label="Irattartó minimum célösszeg" hint="Ez alatt figyelmeztetés jelenik meg a Főoldalon"><AmountInput value={reserveTarget} onChange={setReserveTarget} /></Field>
-        <button className="btn primary full" onClick={save}>Mentés</button>
       </div>
     </Sheet>
   );

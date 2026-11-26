@@ -17,14 +17,12 @@ export function publicSettings(s) {
   return {
     pinLength: s.pin_length,
     autolockMinutes: s.autolock_minutes,
-    reserveTarget: s.reserve_target,
   };
 }
 
 export async function updateSettings(db, input) {
   const map = {
     autolockMinutes: 'autolock_minutes',
-    reserveTarget: 'reserve_target',
   };
   const sets = [];
   const vals = [];
@@ -394,13 +392,7 @@ export async function getState(db) {
     () => getCategoryMemory(db),
   ]);
   const active = wallets.filter((w) => !w.archived || w.balance !== 0);
-  const reserveTarget = settings.reserve_target;
   const alerts = [];
-  for (const w of wallets) {
-    if (w.kind === 'reserve' && !w.archived && w.balance < reserveTarget) {
-      alerts.push({ type: 'reserve', walletId: w.id, balance: w.balance, target: reserveTarget, missing: reserveTarget - w.balance });
-    }
-  }
   if (drafts > 0) alerts.push({ type: 'drafts', count: drafts });
   return {
     settings: publicSettings(settings),

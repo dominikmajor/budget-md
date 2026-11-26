@@ -1,14 +1,14 @@
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertTriangle, Hourglass, CheckCircle2, ArrowLeftRight, ChevronRight } from 'lucide-react';
+import { Eye, EyeOff, Hourglass, ArrowLeftRight, ChevronRight } from 'lucide-react';
 import { useApp } from '../store.jsx';
 import { Card, Empty, Money, Progress, SectionTitle } from '../components/ui.jsx';
 import TxRow from '../components/TxRow.jsx';
-import { formatHUF, isGoalKind, mainWallet } from '../lib/util.js';
+import { isGoalKind } from '../lib/util.js';
 
 export default function Dashboard() {
-  const { state, hidden, toggleHidden, openSheet, walletsById } = useApp();
+  const { state, hidden, toggleHidden, openSheet } = useApp();
   const navigate = useNavigate();
-  const { summary, alerts, wallets, recent, settings } = state;
+  const { summary, alerts, wallets, recent } = state;
   const pockets = wallets.filter((w) => !w.archived && !isGoalKind(w.kind));
   const pick = (kind) => {
     const list = wallets.filter((w) => !w.archived && w.kind === kind);
@@ -16,31 +16,17 @@ export default function Dashboard() {
   };
   const featured = pick('envelope');
   const featuredVaults = pick('vault');
-  const otp = mainWallet(wallets);
 
   return (
     <div className="dash">
       {alerts.length > 0 && (
       <div className="dash-alerts">
       {alerts.map((a) =>
-        a.type === 'reserve' ? (
-          <div key="reserve" className="alert warn">
-            <AlertTriangle size={20} />
-            <div className="alert-text">
-              Az {walletsById[a.walletId]?.name || 'Irattartó'}ban jelenleg <b>{formatHUF(a.balance)}</b> van
-              ({formatHUF(a.missing)} hiányzik a {formatHUF(a.target)}-os célhoz).
-            </div>
-            <button className="btn small solid-warn" onClick={() => openSheet('transfer', { from: otp?.id, to: a.walletId, amount: a.missing, note: 'Irattartó pótlása' })}>
-              Feltöltés {Math.round(a.target / 1000)}k-ra
-            </button>
-          </div>
-        ) : (
           <button key="drafts" className="alert draft" onClick={() => navigate('/tranzakciok?nezet=rendszerezes')}>
             <Hourglass size={20} />
             <div className="alert-text"><b>{a.count} rögzített tétel</b> vár rendszerezésre</div>
             <ChevronRight size={18} />
           </button>
-        ),
       )}
       </div>
       )}
@@ -62,13 +48,10 @@ export default function Dashboard() {
 
       <div className="hscroll pockets-row">
         {pockets.map((w) => {
-          const isReserve = w.kind === 'reserve';
-          const okReserve = w.balance >= settings.reserveTarget;
           return (
             <Card key={w.id} className="pocket" onClick={() => navigate(`/tranzakciok?tarca=${w.id}`)} style={{ '--c': w.color }}>
               <div className="pocket-head">
                 <span className="pocket-icon">{w.icon}</span>
-                {isReserve && (okReserve ? <CheckCircle2 size={16} className="ok-ico" /> : <AlertTriangle size={16} className="warn-ico" />)}
               </div>
               <div className="pocket-name">{w.name}</div>
               <Money value={w.balance} className="pocket-amount" />
