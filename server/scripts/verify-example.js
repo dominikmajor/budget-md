@@ -38,7 +38,7 @@ try {
   await db.query(`SET LOCAL search_path TO ${schema}`);
   await runMigrations(db, { log: () => {} });
 
-  // Az alapkategóriák törölve vannak (005) – csak a rejtett rendszer-kategóriák maradnak
+  // Az alapkategóriák törölve vannak (006) – csak a rejtett rendszer-kategóriák maradnak
   {
     const { rows } = await db.query('SELECT name, is_system FROM categories');
     check('Nincs előre feltöltött kategória (csak a rejtett Egyenleg korrekció)', () =>
@@ -378,10 +378,10 @@ try {
     const { rows: [vr] } = await db.query(`INSERT INTO wallets (name, kind) VALUES ('Revolut széf', 'vault') RETURNING kind`);
     check('004: meglévő adatbázison is létrehozható széf típusú tárca', () => assert.equal(vr.kind, 'vault'));
 
-    // 005: az alapkategóriák törlése; a saját kategória és a saját alkategória megmarad
+    // 006: az alapkategóriák törlése; a saját kategória és a saját alkategória megmarad
     await db.query(`INSERT INTO categories (name, kind, icon, parent_id)
                     VALUES ('Saját alkategória', 'expense', '🌟', (SELECT id FROM categories WHERE name = 'Kaja'))`);
-    await db.query(await fs.readFile(new URL('005_remove_default_categories.sql', dir), 'utf8'));
+    await db.query(await fs.readFile(new URL('006_remove_default_categories.sql', dir), 'utf8'));
     const left = (await db.query('SELECT name, parent_id FROM categories WHERE NOT is_system ORDER BY name')).rows;
     const { rows: [t2] } = await db.query('SELECT category_id FROM transactions WHERE id = $1', [tx.id]);
     const tpl = (await db.query('SELECT COUNT(*)::int AS n FROM templates WHERE category_id IS NOT NULL')).rows[0].n;

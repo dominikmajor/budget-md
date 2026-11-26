@@ -69,7 +69,7 @@ NODE_ENV=production npm start   # az API kiszolgálja a buildelt frontendet is a
 - Áthelyezés: bármelyik azonos típusú kategória alá (a saját ága alá nem).
 - Törlés: az alkategóriák egy szinttel feljebb lépnek. Ha tételek tartoznak a kategóriához, meg kell adni, hová kerüljenek (másik kategória vagy „Kategória nélkül”) – enélkül a szerver nem engedi a törlést.
 - A 003-as migráció a régi adatokat átalakítja: a projektek a „Side-hustle” kategória alkategóriái lettek (a tételeik oda kerültek), a #címkék a tételek megjegyzésének végére íródtak. Régi JSON mentés visszatöltésekor ugyanez automatikusan megtörténik.
-- A 005-ös migráció a korábban előre feltöltött alapkategóriákat törli (a hozzájuk rendelt tételek „Kategória nélkül” maradnak, a saját kategóriák megmaradnak).
+- A 006-os migráció a korábban előre feltöltött alapkategóriákat törli (a hozzájuk rendelt tételek „Kategória nélkül” maradnak, a saját kategóriák megmaradnak).
 - Az app tisztán nyilvántartó: nincs költési keret. Az egyetlen célszint az Irattartó minimuma (figyelmeztetés a Főoldalon).
 
 ## Pénzügyi logika
