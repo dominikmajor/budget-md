@@ -1,4 +1,4 @@
-# Budget – személyes pénzügyi és budget webalkalmazás
+# budget.md – személyes pénzügyi és budget webalkalmazás
 
 Egyfelhasználós, PIN-kóddal védett pénzügyi nyilvántartó, minden képernyőméretre optimalizálva:
 mobilon alsó navigációs sáv és alulról felúszó panelek, tableten ikonos oldalsáv, asztali gépen

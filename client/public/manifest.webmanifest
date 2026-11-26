@@ -1,9 +1,9 @@
 {
-  "name": "Budget – személyes pénzügyek",
-  "short_name": "Budget",
+  "name": "budget.md – személyes pénzügyek",
+  "short_name": "budget.md",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#0a0a0f",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "background_color": "#f5f6f5",
+  "theme_color": "#0d9373",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }

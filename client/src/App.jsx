@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { api, setUnauthorizedHandler } from './api.js';
 import { AppProvider, useApp } from './store.jsx';
 import Login from './pages/Login.jsx';
+import { BrandMark } from './components/Brand.jsx';
 import Layout from './components/Layout.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Transactions from './pages/Transactions.jsx';
@@ -35,7 +36,7 @@ export default function App() {
     setUnauthorizedHandler(() => setAuth((a) => (a ? { ...a, authenticated: false } : a)));
   }, []);
 
-  if (!auth) return <div className="splash"><div className="splash-logo" /></div>;
+  if (!auth) return <div className="splash"><BrandMark className="splash-logo" /></div>;
   if (auth.offline) {
     return (
       <div className="splash">

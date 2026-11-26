@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Home, List, Plus, Wallet, BarChart3, Lock, Settings, Hourglass, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../store.jsx';
 import { Toast } from './ui.jsx';
+import { BrandMark, Wordmark } from './Brand.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import TransferSheet from './TransferSheet.jsx';
 import TxDetail from './TxDetail.jsx';
@@ -45,7 +46,7 @@ export default function Layout() {
             <p>{error.message}</p>
             <button className="btn primary" onClick={() => refresh()}>Újra</button>
           </div>
-        ) : <div className="splash-logo" />}
+        ) : <BrandMark className="splash-logo" />}
       </div>
     );
   }
@@ -56,8 +57,8 @@ export default function Layout() {
     <div className="app">
       <aside className="sidebar" aria-label="Fő navigáció">
         <div className="sb-brand">
-          <span className="sb-logo" aria-hidden="true" />
-          <b className="sb-label">Budget</b>
+          <BrandMark />
+          <Wordmark className="sb-label" />
         </div>
         <button className="sb-new" onClick={() => openSheet('quick')} title="Új tétel (N)">
           <Plus size={20} strokeWidth={2.5} />
@@ -85,7 +86,7 @@ export default function Layout() {
 
       <div className="app-main">
       <header className="topbar">
-        <h1>{TITLES[pathname] || 'Budget'}</h1>
+        <h1>{TITLES[pathname] || 'budget.md'}</h1>
         <div className="topbar-actions">
           {state.draftCount > 0 && (
             <button className="draft-badge" onClick={() => navigate('/tranzakciok?nezet=rendszerezes')} aria-label={`${state.draftCount} tétel vár rendszerezésre`}>
@@ -107,7 +108,7 @@ export default function Layout() {
       <nav className="bottombar">
         <NavLink to="/" end><Home size={22} /><span>Főoldal</span></NavLink>
         <NavLink to="/tranzakciok"><List size={22} /><span>Tranzakciók</span></NavLink>
-        <button className="fab" onClick={() => openSheet('quick')} aria-label="Gyorsrögzítő"><Plus size={30} strokeWidth={2.5} /></button>
+        <button className="fab" onClick={() => openSheet('quick')} aria-label="Gyorsrögzítő"><Plus strokeWidth={2.25} /></button>
         <NavLink to="/tarcak"><Wallet size={22} /><span>Tárcák</span></NavLink>
         <NavLink to="/statisztika"><BarChart3 size={22} /><span>Statisztika</span></NavLink>
       </nav>

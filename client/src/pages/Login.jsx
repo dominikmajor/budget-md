@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Lock } from 'lucide-react';
 import PinPad from '../components/PinPad.jsx';
+import { BrandMark, Wordmark } from '../components/Brand.jsx';
 import { api } from '../api.js';
 import { haptic } from '../lib/util.js';
 
@@ -58,9 +58,8 @@ export default function Login({ status, onSuccess, onStatus }) {
 
   return (
     <div className="login">
-      <div className="login-glow" />
       <div className="login-head">
-        <div className="login-icon"><Lock size={26} /></div>
+        <div className="login-brand"><BrandMark /><Wordmark /></div>
         <h1>{setup ? (first ? 'PIN megerősítése' : 'Hozd létre a PIN-kódod') : 'Üdv újra!'}</h1>
         <p className={`login-msg ${error ? 'err' : ''}`}>
           {wait > 0 ? `Várj ${wait} másodpercet…` : message || (setup ? 'Ezzel védjük a pénzügyeidet' : 'Add meg a PIN-kódod')}

@@ -31,7 +31,7 @@ export default function Settings() {
           </button>
         ))}
       </Card>
-      <p className="muted small center">Budget · egyfelhasználós, PIN-védett · adataid a saját adatbázisodban</p>
+      <p className="muted small center">budget.md · egyfelhasználós, PIN-védett · adataid a saját adatbázisodban</p>
       {open === 'categories' && <CategoriesSheet onClose={() => setOpen(null)} />}
       {open === 'templates' && <TemplatesSheet onClose={() => setOpen(null)} />}
       {open === 'reserve' && <ReserveSheet onClose={() => setOpen(null)} />}
