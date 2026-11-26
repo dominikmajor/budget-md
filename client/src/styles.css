@@ -432,7 +432,7 @@ textarea.input { height: auto; padding: 12px 14px; resize: vertical; }
 .hero-sub span { font-size: 12.5px; color: var(--text-3); }
 .hero-sub .money { font-size: 16px; }
 
-.hscroll { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; scroll-snap-type: x mandatory; }
+.hscroll { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; }
 .hscroll::-webkit-scrollbar { display: none; }
 .pocket { min-width: 148px; padding: 14px; position: relative; scroll-snap-align: start; }
 .pocket-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
