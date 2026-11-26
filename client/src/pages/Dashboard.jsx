@@ -3,16 +3,20 @@ import { Eye, EyeOff, AlertTriangle, Hourglass, CheckCircle2, ArrowLeftRight, Ch
 import { useApp } from '../store.jsx';
 import { Card, Empty, Money, Progress, SectionTitle } from '../components/ui.jsx';
 import TxRow from '../components/TxRow.jsx';
-import { formatHUF } from '../lib/util.js';
+import { formatHUF, isGoalKind, mainWallet } from '../lib/util.js';
 
 export default function Dashboard() {
   const { state, hidden, toggleHidden, openSheet, walletsById } = useApp();
   const navigate = useNavigate();
   const { summary, alerts, wallets, recent, settings } = state;
-  const pockets = wallets.filter((w) => !w.archived && w.kind !== 'envelope');
-  const envelopes = wallets.filter((w) => !w.archived && w.kind === 'envelope');
-  const featured = (envelopes.filter((e) => e.featured).length ? envelopes.filter((e) => e.featured) : envelopes).slice(0, 3);
-  const otp = wallets.find((w) => w.keywords?.includes('otp')) || wallets.find((w) => w.kind === 'account');
+  const pockets = wallets.filter((w) => !w.archived && !isGoalKind(w.kind));
+  const pick = (kind) => {
+    const list = wallets.filter((w) => !w.archived && w.kind === kind);
+    return (list.some((e) => e.featured) ? list.filter((e) => e.featured) : list).slice(0, 3);
+  };
+  const featured = pick('envelope');
+  const featuredVaults = pick('vault');
+  const otp = mainWallet(wallets);
 
   return (
     <div className="dash">
@@ -51,7 +55,7 @@ export default function Dashboard() {
         </div>
         <div className="hero-amount"><Money value={summary.liquid} /></div>
         <div className="hero-sub">
-          <div><span>Borítékok + Irattartó</span><Money value={summary.saved} /></div>
+          <div><span>Félretett</span><Money value={summary.saved} /></div>
           <div><span>Teljes vagyon</span><Money value={summary.total} /></div>
         </div>
       </div>
@@ -77,25 +81,8 @@ export default function Dashboard() {
         })}
       </div>
 
-      {featured.length > 0 && (
-        <>
-          <SectionTitle action={<button className="link-btn" onClick={() => navigate('/tarcak')}>Összes</button>}>Borítékok</SectionTitle>
-          <div className="envelopes-mini">
-            {featured.map((e) => (
-              <Card key={e.id} className="env-mini" onClick={() => navigate('/tarcak')} style={{ '--c': e.color }}>
-                <div className="env-mini-row">
-                  <span>{e.icon} {e.name}</span>
-                  {e.targetAmount ? <b>{Math.round((e.balance / e.targetAmount) * 100)}%</b> : null}
-                </div>
-                <div className="env-mini-amt">
-                  <Money value={e.balance} />{e.targetAmount ? <span className="muted"> / <Money value={e.targetAmount} /></span> : null}
-                </div>
-                {e.targetAmount ? <Progress value={e.balance} max={e.targetAmount} tone="accent" thin /> : null}
-              </Card>
-            ))}
-          </div>
-        </>
-      )}
+      <GoalGroup title="Borítékok" items={featured} />
+      <GoalGroup title="Széfek" items={featuredVaults} />
 
       </div>
 
@@ -109,5 +96,30 @@ export default function Dashboard() {
       </Card>
       </div>
     </div>
+  );
+}
+
+/** Kiemelt borítékok / széfek kis kártyái a Főoldalon. */
+function GoalGroup({ title, items }) {
+  const navigate = useNavigate();
+  if (!items.length) return null;
+  return (
+    <>
+      <SectionTitle action={<button className="link-btn" onClick={() => navigate('/tarcak')}>Összes</button>}>{title}</SectionTitle>
+      <div className="envelopes-mini">
+        {items.map((e) => (
+          <Card key={e.id} className="env-mini" onClick={() => navigate('/tarcak')} style={{ '--c': e.color }}>
+            <div className="env-mini-row">
+              <span>{e.icon} {e.name}</span>
+              {e.targetAmount ? <b>{Math.round((e.balance / e.targetAmount) * 100)}%</b> : null}
+            </div>
+            <div className="env-mini-amt">
+              <Money value={e.balance} />{e.targetAmount ? <span className="muted"> / <Money value={e.targetAmount} /></span> : null}
+            </div>
+            {e.targetAmount ? <Progress value={e.balance} max={e.targetAmount} tone="accent" thin /> : null}
+          </Card>
+        ))}
+      </div>
+    </>
   );
 }

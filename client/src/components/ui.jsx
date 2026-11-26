@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { childrenMap, isActive, pathOf } from '@budget/shared/categories';
 import { useApp } from '../store.jsx';
-import { formatHUF, TYPE_META } from '../lib/util.js';
+import { formatHUF, TYPE_META, isGoalKind } from '../lib/util.js';
 
 export function Money({ value, type, sign, className = '', hideable = true }) {
   const { hidden } = useApp();
@@ -74,7 +74,8 @@ export function AmountInput({ value, onChange, autoFocus, tone }) {
 
 export function WalletPicker({ value, onChange, exclude, includeEnvelopes = true, allowNone }) {
   const { state } = useApp();
-  const list = state.wallets.filter((w) => !w.archived && w.id !== exclude && (includeEnvelopes || w.kind !== 'envelope'));
+  // includeEnvelopes=false: a célgyűjtők (borítékok, széfek) kimaradnak
+  const list = state.wallets.filter((w) => !w.archived && w.id !== exclude && (includeEnvelopes || !isGoalKind(w.kind)));
   return (
     <div className="picker">
       {allowNone && <Chip active={!value} onClick={() => onChange(null)}>Nincs</Chip>}

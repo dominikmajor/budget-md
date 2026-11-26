@@ -63,6 +63,31 @@ test('alkategória: a specifikusabb kulcsszó nyer, archivált ős alatti nem', 
   assert.equal(parseQuickEntry('+8000 korrepetálás otp', c).categoryId, 31);
   assert.equal(parseQuickEntry('+8000 forditas otp', c).categoryId, null);
 });
+test('széfek: „széf <név>”, név, egyetlen széfnél a „széf” szó', () => {
+  const w = [
+    ...wallets,
+    { id: 6, name: 'Utazás', kind: 'vault', keywords: ['utazas'] },
+    { id: 7, name: 'Új laptop', kind: 'vault', keywords: ['laptop'] },
+    { id: 8, name: 'Régi széf', kind: 'vault', keywords: ['regi'], archived: true },
+  ];
+  const c = { wallets: w, categories };
+  let r = parseQuickEntry('8000 revo > széf utazás', c);
+  assert.deepEqual([r.type, r.walletId, r.toWalletId, r.name, r.valid], ['transfer', 2, 6, '', true]);
+  r = parseQuickEntry('5000 széf laptop -> otp', c);
+  assert.deepEqual([r.walletId, r.toWalletId, r.name], [7, 1, '']);
+  r = parseQuickEntry('3000 revo > széf új laptop', c);
+  assert.deepEqual([r.toWalletId, r.name], [7, '']);
+  r = parseQuickEntry('2000 revo > laptop', c);
+  assert.equal(r.toWalletId, 7);
+  // több széf mellett a puszta „széf” nem dönt
+  assert.equal(parseQuickEntry('2000 revo > széf', c).toWalletId, null);
+  // archivált széf nem jöhet szóba
+  assert.equal(parseQuickEntry('2000 revo > regi', c).toWalletId, null);
+  // egyetlen aktív széf esetén a „széf” elég
+  const one = { wallets: [...wallets, { id: 6, name: 'Utazás', kind: 'vault', keywords: [] }], categories };
+  r = parseQuickEntry('10k revo > széfbe', one);
+  assert.deepEqual([r.amount, r.walletId, r.toWalletId, r.valid], [10000, 2, 6, true]);
+});
 test('formázás', () => {
   assert.equal(formatHUF(-1500), '-1 500 Ft');
   assert.equal(formatHUF(16000, { sign: true }), '+16 000 Ft');

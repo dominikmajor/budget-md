@@ -3,22 +3,25 @@ import { ArrowLeftRight, Plus, MoreHorizontal, ArrowDownLeft, ArrowUpRight, Chec
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store.jsx';
 import { Card, Money, Progress, SectionTitle, Empty } from '../components/ui.jsx';
-import { formatHUF, weeklySuggestion, monthName, monthBy, WALLET_KIND } from '../lib/util.js';
+import { formatHUF, weeklySuggestion, monthName, monthBy, WALLET_KIND, isGoalKind, mainWallet, vaultSource } from '../lib/util.js';
 
 export default function Wallets() {
   const { state, openSheet } = useApp();
   const [showArchived, setShowArchived] = useState(false);
-  const pockets = state.wallets.filter((w) => w.kind !== 'envelope' && (showArchived || !w.archived));
-  const envelopes = state.wallets.filter((w) => w.kind === 'envelope' && (showArchived || !w.archived));
+  const visible = state.wallets.filter((w) => showArchived || !w.archived);
+  const pockets = visible.filter((w) => !isGoalKind(w.kind));
+  const envelopes = visible.filter((w) => w.kind === 'envelope');
+  const vaults = visible.filter((w) => w.kind === 'vault');
   const archivedCount = state.wallets.filter((w) => w.archived).length;
-  const firstLiquid = state.wallets.find((w) => w.keywords?.includes('otp')) || state.wallets.find((w) => w.kind === 'account');
+  const firstLiquid = mainWallet(state.wallets);
+  const vaultFrom = vaultSource(state.wallets);
 
   return (
     <div className="stack">
       <div className="wallets-top">
       <button className="big-action" onClick={() => openSheet('transfer')}>
         <span className="big-action-icon"><ArrowLeftRight size={22} /></span>
-        <span><b>Pénz mozgatása</b><small>Átcsoportosítás tárcák és borítékok között</small></span>
+        <span><b>Pénz mozgatása</b><small>Átcsoportosítás tárcák, borítékok és széfek között</small></span>
       </button>
 
       <div className="totals-row">
@@ -44,6 +47,17 @@ export default function Wallets() {
         </div>
       ) : (
         <Empty icon="✉️" title="Még nincs boríték" text="Hozz létre egyet egy megtakarítási célhoz." />
+      )}
+
+      <SectionTitle action={<button className="link-btn" onClick={() => openSheet('wallet', { kind: 'vault' })}><Plus size={16} /> Új széf</button>}>
+        Széfek
+      </SectionTitle>
+      {vaults.length ? (
+        <div className="env-grid">
+          {vaults.map((e) => <EnvelopeCard key={e.id} e={e} defaultSource={vaultFrom} />)}
+        </div>
+      ) : (
+        <Empty icon="🔐" title="Még nincs széf" text="A Revolutban külön zsebekben (Vaults) tartott pénzedet itt követheted." />
       )}
 
       {archivedCount > 0 && (
@@ -96,8 +110,10 @@ function PocketCard({ w }) {
   );
 }
 
+/** Boríték vagy széf kártyája: egyenleg, opcionális cél és haladás, befizetés / kivétel. */
 function EnvelopeCard({ e, defaultSource }) {
   const { openSheet } = useApp();
+  const isVault = e.kind === 'vault';
   const pct = e.targetAmount ? Math.round((e.balance / e.targetAmount) * 100) : null;
   const sug = weeklySuggestion(e);
   const reached = e.targetAmount && e.balance >= e.targetAmount;
@@ -113,7 +129,7 @@ function EnvelopeCard({ e, defaultSource }) {
       </div>
       <div className="env-amount">
         <Money value={e.balance} className="lg" />
-        {e.targetAmount ? <span className="muted"> / <Money value={e.targetAmount} /></span> : <span className="muted small"> · szabad gyűjtőboríték</span>}
+        {e.targetAmount ? <span className="muted"> / <Money value={e.targetAmount} /></span> : <span className="muted small"> · {isVault ? 'cél nélküli széf' : 'szabad gyűjtőboríték'}</span>}
       </div>
       {e.targetAmount ? (
         <>
@@ -126,10 +142,10 @@ function EnvelopeCard({ e, defaultSource }) {
         </>
       ) : null}
       <div className="row gap">
-        <button className="btn small ghost grow" onClick={() => openSheet('transfer', { from: defaultSource?.id, to: e.id, note: `Félretétel: ${e.name}` })}>
+        <button className="btn small ghost grow" onClick={() => openSheet('transfer', { from: defaultSource?.id, to: e.id, note: `${isVault ? 'Széfbe' : 'Félretétel'}: ${e.name}` })}>
           <Plus size={15} /> Befizetés
         </button>
-        <button className="btn small ghost grow" onClick={() => openSheet('transfer', { from: e.id, to: defaultSource?.id, note: `Kivétel: ${e.name}` })}>
+        <button className="btn small ghost grow" onClick={() => openSheet('transfer', { from: e.id, to: defaultSource?.id, note: `${isVault ? 'Széfből' : 'Kivétel'}: ${e.name}` })}>
           <Minus size={15} /> Kivétel
         </button>
       </div>

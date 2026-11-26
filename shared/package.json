@@ -7,7 +7,8 @@
     "./parser": "./parser.js",
     "./format": "./format.js",
     "./text": "./text.js",
-    "./categories": "./categories.js"
+    "./categories": "./categories.js",
+    "./wallets": "./wallets.js"
   },
   "scripts": {
     "test": "node --test"
