@@ -9,7 +9,7 @@ import { formatHUF, TYPE_META, haptic } from '../lib/util.js';
 
 /** Globális gyorsrögzítő: szabadszöveges bevitel, villám-piszkozat, sablonok, részletes űrlap. */
 export default function QuickAdd({ onClose, mode: initialMode = 'text', initial }) {
-  const { state, walletsById, categoriesById, mutate } = useApp();
+  const { state, walletsById, categoriesById, categoryLabel, mutate } = useApp();
   const [mode, setMode] = useState(initialMode);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -102,7 +102,7 @@ export default function QuickAdd({ onClose, mode: initialMode = 'text', initial 
               ) : (
                 <span>Tárca: {w ? `${w.icon} ${w.name}` : <em>nincs megadva</em>}</span>
               )}
-              {parsed.type !== 'transfer' && <span>Kategória: {cat ? `${cat.icon} ${cat.name}` : <em>—</em>}</span>}
+              {parsed.type !== 'transfer' && <span>Kategória: {cat ? `${cat.icon} ${categoryLabel(cat.id)}` : <em>—</em>}</span>}
             </div>
           </div>
         )}

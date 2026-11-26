@@ -13,6 +13,9 @@ import * as F from '../src/services/finance.js';
 import { getStats } from '../src/services/stats.js';
 import { parseQuickEntry } from '@budget/shared/parser';
 import { formatHUF } from '@budget/shared/format';
+import { rollup, pathLabel } from '@budget/shared/categories';
+import { exportJson, importJson, upgradeBackup } from '../src/services/backup.js';
+import fs from 'node:fs/promises';
 
 const db = await pool.connect();
 let failures = 0;
@@ -90,7 +93,7 @@ try {
     s = await state();
     check('Jóváhagyás után 0 piszkozat', () => assert.equal(s.draftCount, 0));
     check('Költős: 7 000 → 5 500', () => assert.equal(s.wallets.find((w) => w.name === 'Költős').balance, 5500));
-    check('Heti Költős keretből 1 500 levonva', () => assert.equal(s.spending.spent, 1500));
+    check('Nincs költési keret az állapotban (tisztán nyilvántartás)', () => assert.equal('spending' in s, false));
   }
 
   console.log('\n3. DM 2 500 Revolutról — "dm 2500 revo"');
@@ -109,13 +112,18 @@ try {
     check('Revolut: 12 000 → 9 500', () => assert.equal(b.Revolut, 9500));
   }
 
-  console.log('\n4. Munkából 16 000 Ft OTP-re — részletes űrlap, Projekt: Side-hustle #1, #munka');
+  console.log('\n4. Munkából 16 000 Ft OTP-re — részletes űrlap, kategória: Side-hustle › Side-hustle #1');
   {
     const s0 = await state();
-    const project = s0.projects.find((p) => p.name === 'Side-hustle #1');
+    const sub = s0.categories.find((c) => c.name === 'Side-hustle #1');
+    const root = s0.categories.find((c) => c.name === 'Side-hustle' && c.kind === 'income');
+    check('A régi projektek a Side-hustle alkategóriái lettek', () => {
+      assert.equal(sub?.parentId, root.id);
+      assert.equal(sub.kind, 'income');
+      assert.equal(s0.categories.filter((c) => c.parentId === root.id).length, 3);
+    });
     await F.createTransaction(db, {
-      type: 'income', amount: 16000, walletId: await wid('OTP Számla'), projectId: project.id,
-      categoryId: await cid('Side-hustle', 'income'), name: 'Munka', tags: ['#munka'],
+      type: 'income', amount: 16000, walletId: await wid('OTP Számla'), categoryId: sub.id, name: 'Munka',
     });
     const s = await state();
     check('OTP: 45 000 → 61 000', () => assert.equal(s.wallets.find((w) => w.name === 'OTP Számla').balance, 61000));
@@ -166,8 +174,15 @@ try {
       assert.equal(st.totals.income, 20000);
       assert.equal(st.totals.expense, 9000);
     });
-    check('Side-hustle #1 forrásként 16 000 Ft', () =>
-      assert.equal(st.incomeSources.find((x) => x.name === 'Side-hustle #1')?.amount, 16000));
+    const cats = s.categories;
+    const incomeById = Object.fromEntries(st.categoryTotals.filter((x) => x.type === 'income').map((x) => [x.id, x.amount]));
+    const rolled = rollup(cats, incomeById);
+    const shRoot = cats.find((c) => c.name === 'Side-hustle' && c.kind === 'income');
+    const sh1 = cats.find((c) => c.name === 'Side-hustle #1');
+    check('Side-hustle #1 alkategória 16 000 Ft, a Side-hustle főkategória összesítve 16 000 Ft', () => {
+      assert.equal(rolled.get(sh1.id), 16000);
+      assert.equal(rolled.get(shRoot.id), 16000);
+    });
 
     // Szerkesztés/törlés pontos visszaszámolása
     const dm = (await F.listTransactions(db, { q: 'dm' }))[0];
@@ -185,6 +200,111 @@ try {
       assert.equal(r.diff, -200);
       assert.equal(kolt, 5300);
     });
+  }
+
+  console.log('\nKategóriafa: létrehozás, mozgatás, törlés');
+  {
+    const sp = async (name) => { await db.query(`SAVEPOINT ${name}`); };
+    const expectFail = async (label, fn, re) => {
+      await sp('x');
+      try {
+        await fn();
+        failures++;
+        console.log(`  ❌ ${label}\n     nem dobott hibát`);
+      } catch (e) {
+        await db.query('ROLLBACK TO SAVEPOINT x');
+        check(label, () => assert.match(e.message, re));
+      }
+    };
+    const kaja = await cid('Kaja', 'expense');
+    const bolt = await F.createCategory(db, { name: 'Bolt', parentId: kaja, kind: 'income' });
+    const lidl = await F.createCategory(db, { name: 'Lidl', parentId: bolt, keywords: 'lidl' });
+    const akcio = await F.createCategory(db, { name: 'Akciós', parentId: lidl });
+    let s = await state();
+    const byId = Object.fromEntries(s.categories.map((c) => [c.id, c]));
+    check('3 szint mély alkategória, a típust a szülőtől örökli', () => {
+      assert.equal(pathLabel(akcio, byId), 'Kaja › Bolt › Lidl › Akciós');
+      assert.equal(byId[bolt].kind, 'expense');
+    });
+    const p = parseQuickEntry('lidl 4200 otp', { wallets: s.wallets, categories: s.categories, memory: {} });
+    check('Gyorsbevitel: "lidl" → a specifikusabb Kaja › Bolt › Lidl alkategória', () => assert.equal(p.categoryId, lidl));
+    const tx1 = await F.createTransaction(db, p);
+    await F.createTransaction(db, { type: 'expense', amount: 800, walletId: await wid('OTP Számla'), categoryId: akcio, name: 'Akciós kifli' });
+    const filtered = await F.listTransactions(db, { category: kaja });
+    check('Szűrés a Kaja főkategóriára az alkategóriák tételeit is mutatja', () => assert.equal(filtered.length, 2));
+
+    await expectFail('Nem mozgatható a saját alkategóriája alá', () => F.updateCategory(db, bolt, { parentId: akcio }), /saját alkategóriája/);
+    await expectFail('Kiadás-kategória nem kerülhet bevétel-kategória alá', async () => F.updateCategory(db, bolt, { parentId: await cid('Ösztöndíj', 'income') }), /csak kiadás/);
+    const egyeb = await cid('Egyéb kiadás', 'expense');
+    await F.updateCategory(db, lidl, { parentId: egyeb, name: 'Lidl áruház' });
+    s = await state();
+    const byId2 = Object.fromEntries(s.categories.map((c) => [c.id, c]));
+    check('Áthelyezés és átnevezés: Egyéb kiadás › Lidl áruház › Akciós', () => assert.equal(pathLabel(akcio, byId2), 'Egyéb kiadás › Lidl áruház › Akciós'));
+
+    await expectFail('Tételekkel rendelkező kategória nem törölhető cél megadása nélkül', () => F.deleteCategory(db, lidl), /tétel tartozik/);
+    await F.deleteCategory(db, lidl, { moveTo: kaja });
+    s = await state();
+    const tx = await F.getTransaction(db, tx1);
+    check('Törléskor a tételek a választott kategóriába kerülnek, az alkategória feljebb lép', () => {
+      assert.equal(tx.categoryId, kaja);
+      assert.equal(s.categories.find((c) => c.id === akcio).parentId, egyeb);
+    });
+    await F.deleteCategory(db, bolt);
+    const afterDel = await state();
+    check('Üres kategória cél nélkül is törölhető', () => assert.equal(afterDel.categories.some((c) => c.id === bolt), false));
+    await expectFail('A rendszer-kategória nem törölhető', () => F.deleteCategory(db, s.categories.find((c) => c.isSystem).id, { moveTo: 'none' }), /rendszer/);
+  }
+
+  console.log('\nMentés és visszatöltés');
+  {
+    const before = await state();
+    const backup = JSON.parse(JSON.stringify(await exportJson(db)));
+    await importJson(db, backup);
+    const after = await state();
+    check('JSON mentés → visszatöltés után azonosak az egyenlegek és a kategóriafa', () => {
+      assert.deepEqual(after.summary, before.summary);
+      assert.deepEqual(after.categories.map((c) => [c.id, c.parentId, c.name]), before.categories.map((c) => [c.id, c.parentId, c.name]));
+    });
+    const old = upgradeBackup({
+      app: 'budget-app', version: 1,
+      tables: {
+        categories: [{ id: 1, name: 'Side-hustle', kind: 'income', is_system: false }],
+        projects: [{ id: 7, name: 'Korrepetálás', color: '#3b82f6' }],
+        tags: [{ id: 3, name: 'egyetem' }],
+        transactions: [{ id: 5, type: 'income', amount: 100, category_id: 1, project_id: 7, note: '' }],
+        transaction_tags: [{ transaction_id: 5, tag_id: 3 }],
+      },
+    });
+    const sub = old.tables.categories.find((c) => c.name === 'Korrepetálás');
+    check('Régi (projektes, címkés) mentés átalakítása: projekt → alkategória, címke → megjegyzés', () => {
+      assert.equal(sub.parent_id, 1);
+      assert.equal(old.tables.transactions[0].category_id, sub.id);
+      assert.equal(old.tables.transactions[0].note, '#egyetem');
+      assert.equal('project_id' in old.tables.transactions[0], false);
+    });
+  }
+
+  console.log('\nMigráció meglévő (projektes, címkés, keretes) adatbázison');
+  {
+    const legacy = `${schema}_legacy`;
+    await db.query(`CREATE SCHEMA ${legacy}`);
+    await db.query(`SET LOCAL search_path TO ${legacy}`);
+    const dir = new URL('../migrations/', import.meta.url);
+    for (const f of ['001_schema.sql', '002_seed.sql']) await db.query(await fs.readFile(new URL(f, dir), 'utf8'));
+    const { rows: [tx] } = await db.query(
+      `INSERT INTO transactions (type, amount, wallet_id, category_id, project_id, name, note)
+       VALUES ('income', 9000, (SELECT id FROM wallets LIMIT 1), (SELECT id FROM categories WHERE name = 'Side-hustle'),
+               (SELECT id FROM projects WHERE name = 'Korrepetálás'), 'Óra', 'Matek') RETURNING id`);
+    await db.query(`INSERT INTO tags (name) VALUES ('egyetem'), ('matek')`);
+    await db.query(`INSERT INTO transaction_tags SELECT $1, id FROM tags`, [tx.id]);
+    await db.query(await fs.readFile(new URL('003_category_tree.sql', dir), 'utf8'));
+    const { rows: [m] } = await db.query(
+      `SELECT t.note, c.name, p.name AS parent FROM transactions t
+       JOIN categories c ON c.id = t.category_id JOIN categories p ON p.id = c.parent_id WHERE t.id = $1`, [tx.id]);
+    const gone = await db.query(`SELECT to_regclass('${legacy}.projects') AS p, to_regclass('${legacy}.tags') AS t`);
+    check('A projekthez rendelt tétel a Side-hustle › Korrepetálás kategóriába került', () => assert.deepEqual([m.parent, m.name], ['Side-hustle', 'Korrepetálás']));
+    check('A címkék a megjegyzés végére kerültek', () => assert.equal(m.note, 'Matek\n#egyetem #matek'));
+    check('A projektek és címkék táblái megszűntek', () => assert.deepEqual([gone.rows[0].p, gone.rows[0].t], [null, null]));
   }
 
   await db.query('ROLLBACK');

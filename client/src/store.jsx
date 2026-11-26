@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
 import { byId } from './lib/util.js';
+import { pathLabel } from '@budget/shared/categories';
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -38,11 +39,13 @@ export function AppProvider({ children, onLock }) {
   }, []);
 
   const value = useMemo(() => {
+    const categoriesById = state ? byId(state.categories) : {};
     const maps = state
       ? {
           walletsById: byId(state.wallets),
-          categoriesById: byId(state.categories),
-          projectsById: byId(state.projects),
+          categoriesById,
+          /** „Side-hustle › Korrepetálás” */
+          categoryLabel: (id) => pathLabel(id, categoriesById),
         }
       : {};
     return {

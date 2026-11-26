@@ -49,6 +49,20 @@ test('memória felülírja a kulcsszót', () => {
   const r = parseQuickEntry('fagyi 900 kp', { ...ctx, memory: { fagyi: 11 } });
   assert.equal(r.categoryId, 11);
 });
+test('alkategória: a specifikusabb kulcsszó nyer, archivált ős alatti nem', () => {
+  const cats = [
+    { id: 30, name: 'Side-hustle', kind: 'income', keywords: ['munka'] },
+    { id: 31, name: 'Korrepetálás', kind: 'income', parentId: 30, keywords: ['korrep'] },
+    { id: 32, name: 'Grafika', kind: 'income', parentId: 30, keywords: ['logo', 'munka'] },
+    { id: 40, name: 'Régi', kind: 'income', archived: true },
+    { id: 41, name: 'Fordítás', kind: 'income', parentId: 40, keywords: ['forditas'] },
+  ];
+  const c = { wallets, categories: cats };
+  assert.equal(parseQuickEntry('+8000 korrep otp', c).categoryId, 31);
+  assert.equal(parseQuickEntry('+8000 munka otp', c).categoryId, 32);
+  assert.equal(parseQuickEntry('+8000 korrepetálás otp', c).categoryId, 31);
+  assert.equal(parseQuickEntry('+8000 forditas otp', c).categoryId, null);
+});
 test('formázás', () => {
   assert.equal(formatHUF(-1500), '-1 500 Ft');
   assert.equal(formatHUF(16000, { sign: true }), '+16 000 Ft');

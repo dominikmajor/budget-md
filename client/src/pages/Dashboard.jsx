@@ -5,14 +5,10 @@ import { Card, Empty, Money, Progress, SectionTitle } from '../components/ui.jsx
 import TxRow from '../components/TxRow.jsx';
 import { formatHUF } from '../lib/util.js';
 
-export function spendTone(ratio) {
-  return ratio >= 0.95 ? 'red' : ratio >= 0.7 ? 'yellow' : 'green';
-}
-
 export default function Dashboard() {
   const { state, hidden, toggleHidden, openSheet, walletsById } = useApp();
   const navigate = useNavigate();
-  const { summary, alerts, spending, wallets, recent, settings } = state;
+  const { summary, alerts, wallets, recent, settings } = state;
   const pockets = wallets.filter((w) => !w.archived && w.kind !== 'envelope');
   const envelopes = wallets.filter((w) => !w.archived && w.kind === 'envelope');
   const featured = (envelopes.filter((e) => e.featured).length ? envelopes.filter((e) => e.featured) : envelopes).slice(0, 3);
@@ -80,24 +76,6 @@ export default function Dashboard() {
           );
         })}
       </div>
-
-      {spending && (
-        <Card className="spend">
-          <div className="spend-head">
-            <span>{spending.period === 'week' ? 'Heti' : 'Napi'} {walletsById[spending.walletId]?.name || 'Költős'} keret</span>
-            <b className={`tone-${spendTone(spending.ratio)}`}>{Math.round(spending.ratio * 100)}%</b>
-          </div>
-          <Progress value={spending.spent} max={spending.limit} tone={spendTone(spending.ratio)} />
-          <div className="spend-foot">
-            <span><Money value={spending.spent} /> / <Money value={spending.limit} /> felhasználva</span>
-            <span className={spending.remaining < 0 ? 'neg' : 'muted'}>
-              {spending.remaining >= 0
-                ? <>Még <Money value={spending.remaining} /> maradt {spending.period === 'week' ? 'vasárnapig' : 'mára'}</>
-                : <><Money value={-spending.remaining} /> túllépés</>}
-            </span>
-          </div>
-        </Card>
-      )}
 
       {featured.length > 0 && (
         <>

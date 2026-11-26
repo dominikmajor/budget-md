@@ -52,16 +52,28 @@ r.post('/wallets/:id/reconcile', async (req, res) => {
   res.json(await withTx((db) => F.reconcileWallet(db, id(req), req.body?.actual)));
 });
 
-// ── Egyszerű törzsadatok: kategóriák, projektek, sablonok
+// ── Kategóriafa: létrehozás, szerkesztés/mozgatás, törlés (tételek áthelyezésével)
+r.post('/categories', async (req, res) => {
+  const newId = await withTx((db) => F.createCategory(db, req.body || {}));
+  res.status(201).json({ id: newId });
+});
+r.put('/categories/:id', async (req, res) => {
+  await withTx((db) => F.updateCategory(db, id(req), req.body || {}));
+  res.json({ ok: true });
+});
+r.delete('/categories/:id', async (req, res) => {
+  res.json(await withTx((db) => F.deleteCategory(db, id(req), { moveTo: req.query.moveTo ?? req.body?.moveTo })));
+});
+r.post('/categories/reorder', async (req, res) => {
+  const ids = req.body?.ids || [];
+  await withTx(async (db) => {
+    for (let i = 0; i < ids.length; i++) await db.query('UPDATE categories SET sort_order = $1 WHERE id = $2', [i + 1, ids[i]]);
+  });
+  res.json({ ok: true });
+});
+
+// ── Sablonok
 const simple = {
-  categories: {
-    cols: { name: 'name', kind: 'kind', icon: 'icon', color: 'color', keywords: 'keywords', archived: 'archived', sortOrder: 'sort_order' },
-    required: ['name', 'kind'],
-  },
-  projects: {
-    cols: { name: 'name', color: 'color', archived: 'archived', sortOrder: 'sort_order' },
-    required: ['name'],
-  },
   templates: {
     cols: { name: 'name', emoji: 'emoji', type: 'type', amount: 'amount', walletId: 'wallet_id', categoryId: 'category_id', sortOrder: 'sort_order' },
     required: ['name', 'type', 'amount'],
@@ -125,31 +137,6 @@ r.post('/wallets/reorder', async (req, res) => {
   await withTx(async (db) => {
     for (let i = 0; i < ids.length; i++) await db.query('UPDATE wallets SET sort_order = $1 WHERE id = $2', [i + 1, ids[i]]);
   });
-  res.json({ ok: true });
-});
-
-// ── Címkék: átnevezés (ha már létezik ilyen nevű, összevonás), törlés
-r.put('/tags/:id', async (req, res) => {
-  const name = String(req.body?.name || '').replace(/^#/, '').trim().toLowerCase();
-  if (!name) throw bad('Adj nevet a címkének');
-  await withTx(async (db) => {
-    const existing = await db.query('SELECT id FROM tags WHERE name = $1 AND id <> $2', [name, id(req)]);
-    if (existing.rows[0]) {
-      const target = existing.rows[0].id;
-      await db.query(
-        `INSERT INTO transaction_tags (transaction_id, tag_id)
-         SELECT transaction_id, $1 FROM transaction_tags WHERE tag_id = $2 ON CONFLICT DO NOTHING`,
-        [target, id(req)],
-      );
-      await db.query('DELETE FROM tags WHERE id = $1', [id(req)]);
-    } else {
-      await db.query('UPDATE tags SET name = $1 WHERE id = $2', [name, id(req)]);
-    }
-  });
-  res.json({ ok: true });
-});
-r.delete('/tags/:id', async (req, res) => {
-  await pool.query('DELETE FROM tags WHERE id = $1', [id(req)]);
   res.json({ ok: true });
 });
 

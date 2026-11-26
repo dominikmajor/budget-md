@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store.jsx';
 import { Card, Money, Progress, SectionTitle, Empty } from '../components/ui.jsx';
 import { formatHUF, weeklySuggestion, monthName, monthBy, WALLET_KIND } from '../lib/util.js';
-import { spendTone } from './Dashboard.jsx';
 
 export default function Wallets() {
   const { state, openSheet } = useApp();
@@ -60,7 +59,6 @@ function PocketCard({ w }) {
   const { state, openSheet } = useApp();
   const navigate = useNavigate();
   const target = state.settings.reserveTarget;
-  const spending = state.spending?.walletId === w.id ? state.spending : null;
 
   return (
     <Card className={`pocket-card ${w.archived ? 'archived' : ''}`} style={{ '--c': w.color }}>
@@ -81,16 +79,6 @@ function PocketCard({ w }) {
               ? <span className="pos"><CheckCircle2 size={14} /> Célszint teljesítve</span>
               : <span className="warn"><AlertTriangle size={14} /> Hiányzik: {formatHUF(w.balance - target)}</span>}
             <span className="muted">Cél: {formatHUF(target)}</span>
-          </div>
-        </div>
-      )}
-
-      {spending && (
-        <div className="reserve">
-          <Progress value={spending.spent} max={spending.limit} tone={spendTone(spending.ratio)} />
-          <div className="row between small">
-            <span>{spending.period === 'week' ? 'Heti' : 'Napi'} keret: {formatHUF(spending.spent)} / {formatHUF(spending.limit)}</span>
-            <span className="muted">Maradt: {formatHUF(spending.remaining)}</span>
           </div>
         </div>
       )}

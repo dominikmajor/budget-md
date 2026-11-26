@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { Camera, ImagePlus, Trash2, ArrowDown } from 'lucide-react';
-import { useApp } from '../store.jsx';
-import { AmountInput, CategoryPicker, Field, ProjectPicker, Segmented, TagInput, WalletPicker } from './ui.jsx';
+import { AmountInput, CategoryPicker, Field, Segmented, WalletPicker } from './ui.jsx';
 import { compressImage, toLocalInput } from '../lib/util.js';
 
 const TABS = [
@@ -15,15 +14,12 @@ const TABS = [
  * onSubmit(payload, { asDraft })
  */
 export default function TxForm({ initial = {}, onSubmit, submitLabel = 'Mentés', allowDraft, existingReceiptUrl, busy }) {
-  const { state } = useApp();
   const [type, setType] = useState(initial.type || 'expense');
   const [amount, setAmount] = useState(initial.amount ? String(initial.amount) : '');
   const [walletId, setWalletId] = useState(initial.walletId ?? null);
   const [toWalletId, setToWalletId] = useState(initial.toWalletId ?? null);
   const [name, setName] = useState(initial.name || '');
   const [categoryId, setCategoryId] = useState(initial.categoryId ?? null);
-  const [projectId, setProjectId] = useState(initial.projectId ?? null);
-  const [tags, setTags] = useState(initial.tags || []);
   const [occurredAt, setOccurredAt] = useState(toLocalInput(initial.occurredAt || new Date()));
   const [note, setNote] = useState(initial.note || '');
   const [receipt, setReceipt] = useState(undefined); // undefined = változatlan, null = törlés, string = új
@@ -54,7 +50,6 @@ export default function TxForm({ initial = {}, onSubmit, submitLabel = 'Mentés'
     const payload = {
       type, amount: amt, walletId, toWalletId: type === 'transfer' ? toWalletId : null,
       name: name.trim(), categoryId: type === 'transfer' ? null : categoryId,
-      projectId: type === 'income' ? projectId : null, tags,
       occurredAt: new Date(occurredAt).toISOString(), note,
     };
     if (receipt !== undefined) payload.receipt = receipt;
@@ -71,12 +66,12 @@ export default function TxForm({ initial = {}, onSubmit, submitLabel = 'Mentés'
 
       {type === 'transfer' ? (
         <>
-          <Field label="Honnan (forrás)"><WalletPicker value={walletId} onChange={setWalletId} exclude={toWalletId} /></Field>
+          <Field group label="Honnan (forrás)"><WalletPicker value={walletId} onChange={setWalletId} exclude={toWalletId} /></Field>
           <div className="xfer-arrow"><ArrowDown size={18} /></div>
-          <Field label="Hová (cél)"><WalletPicker value={toWalletId} onChange={setToWalletId} exclude={walletId} /></Field>
+          <Field group label="Hová (cél)"><WalletPicker value={toWalletId} onChange={setToWalletId} exclude={walletId} /></Field>
         </>
       ) : (
-        <Field label="Tárca"><WalletPicker value={walletId} onChange={setWalletId} /></Field>
+        <Field group label="Tárca"><WalletPicker value={walletId} onChange={setWalletId} /></Field>
       )}
 
       <Field label={type === 'transfer' ? 'Megjegyzés / megnevezés' : 'Megnevezés'}>
@@ -85,13 +80,10 @@ export default function TxForm({ initial = {}, onSubmit, submitLabel = 'Mentés'
       </Field>
 
       {type !== 'transfer' && (
-        <Field label="Kategória"><CategoryPicker kind={type} value={categoryId} onChange={setCategoryId} /></Field>
+        <Field group label="Kategória" hint="Az alkategóriák a főkategória kiválasztása után jelennek meg">
+          <CategoryPicker kind={type} value={categoryId} onChange={setCategoryId} />
+        </Field>
       )}
-      {type === 'income' && state.projects.some((p) => !p.archived) && (
-        <Field label="Side-hustle / projekt"><ProjectPicker value={projectId} onChange={setProjectId} /></Field>
-      )}
-
-      <Field label="Címkék"><TagInput value={tags} onChange={setTags} /></Field>
 
       <Field label="Dátum és idő">
         <div className="row gap">

@@ -9,7 +9,7 @@ import { api } from '../api.js';
 import { TYPE_META, fullDateTime } from '../lib/util.js';
 
 export default function TxDetail({ id, onClose, edit: startEdit = false }) {
-  const { categoriesById, projectsById, mutate } = useApp();
+  const { categoriesById, categoryLabel, mutate } = useApp();
   const [tx, setTx] = useState(null);
   const [edit, setEdit] = useState(startEdit);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -22,7 +22,6 @@ export default function TxDetail({ id, onClose, edit: startEdit = false }) {
 
   const receiptUrl = tx.hasReceipt ? `/api/transactions/${tx.id}/receipt?v=${encodeURIComponent(tx.updatedAt)}` : null;
   const cat = categoriesById[tx.categoryId];
-  const project = projectsById[tx.projectId];
 
   const save = async (payload) => {
     setBusy(true);
@@ -58,10 +57,8 @@ export default function TxDetail({ id, onClose, edit: startEdit = false }) {
       <dl className="detail-list">
         <div><dt>{tx.type === 'transfer' ? 'Honnan → Hová' : 'Tárca'}</dt>
           <dd>{tx.type === 'transfer' ? <><WalletBadge id={tx.walletId} /> → <WalletBadge id={tx.toWalletId} /></> : <WalletBadge id={tx.walletId} />}</dd></div>
-        {tx.type !== 'transfer' && <div><dt>Kategória</dt><dd>{cat ? `${cat.icon} ${cat.name}` : '—'}</dd></div>}
-        {tx.type === 'income' && <div><dt>Projekt</dt><dd>{project?.name || '—'}</dd></div>}
+        {tx.type !== 'transfer' && <div><dt>Kategória</dt><dd>{cat ? `${cat.icon} ${categoryLabel(cat.id)}` : '—'}</dd></div>}
         <div><dt>Időpont</dt><dd>{fullDateTime(tx.occurredAt)}</dd></div>
-        {tx.tags.length > 0 && <div><dt>Címkék</dt><dd className="picker">{tx.tags.map((t) => <span key={t} className="chip on tag">#{t}</span>)}</dd></div>}
         {tx.note && <div><dt>Megjegyzés</dt><dd className="pre">{tx.note}</dd></div>}
         <div><dt>Rögzítve</dt><dd className="muted">{fullDateTime(tx.createdAt)}</dd></div>
       </dl>

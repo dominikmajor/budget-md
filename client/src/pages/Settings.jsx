@@ -1,22 +1,22 @@
 import { useRef, useState } from 'react';
-import { ChevronUp, ChevronDown, Pencil, Archive, ArchiveRestore, Plus, Trash2, Download, Upload, KeyRound, ChevronRight } from 'lucide-react';
+import { ChevronUp, ChevronDown, Pencil, Archive, ArchiveRestore, Plus, Trash2, Download, Upload, KeyRound, ChevronRight, CornerDownRight } from 'lucide-react';
+import { childrenMap, descendantIds, flattenTree } from '@budget/shared/categories';
 import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import Sheet from '../components/Sheet.jsx';
 import PinPad from '../components/PinPad.jsx';
-import { AmountInput, Card, Field, Segmented, SectionTitle, WalletPicker, CategoryPicker } from '../components/ui.jsx';
+import { AmountInput, Card, Field, Segmented, WalletPicker, CategoryPicker } from '../components/ui.jsx';
 import { formatHUF, downloadUrl } from '../lib/util.js';
 
-const EMOJIS = ['🍝', '🍦', '🧴', '🎓', '🚌', '🎉', '📦', '💼', '🎁', '✨', '☕', '🍺', '🛒', '👕', '💊', '🏋️', '📚', '🎮', '🏠', '📱', '💡', '🐶', '✂️', '🚕'];
+const EMOJIS = ['🏷️', '💻', '🎨', '📷', '🧾', '🍝', '🍦', '🧴', '🎓', '🚌', '🎉', '📦', '💼', '🎁', '✨', '☕', '🍺', '🛒', '👕', '💊', '🏋️', '📚', '🎮', '🏠', '📱', '💡', '🐶', '✂️', '🚕'];
 const COLORS = ['#f97316', '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#eab308', '#64748b', '#22c55e', '#f43f5e', '#0ea5e9', '#84cc16', '#a855f7'];
 
 export default function Settings() {
   const [open, setOpen] = useState(null);
   const sections = [
-    ['categories', '🏷️', 'Kategóriák kezelése', 'Kiadás és bevétel kategóriák'],
-    ['projects', '💼', 'Side-hustle projektek és címkék', 'Bevételi projektek, #címkék'],
+    ['categories', '🏷️', 'Kategóriák kezelése', 'Kategóriák és alkategóriák tetszőleges mélységben'],
     ['templates', '⚡', 'Gyorsrögzítő sablonok', '1 kattintásos tételek a + gombnál'],
-    ['limits', '🎯', 'Keretek és tárca-szabályok', 'Irattartó célszint, Költős keret'],
+    ['reserve', '🗂️', 'Irattartó célszint', 'Figyelmeztetés a Főoldalon, ha ez alá csökken'],
     ['security', '🔐', 'Biztonság', 'PIN-kód, automatikus zárolás'],
     ['data', '💾', 'Adatok exportálása és mentés', 'CSV, JSON mentés és visszatöltés'],
   ];
@@ -33,9 +33,8 @@ export default function Settings() {
       </Card>
       <p className="muted small center">Budget · egyfelhasználós, PIN-védett · adataid a saját adatbázisodban</p>
       {open === 'categories' && <CategoriesSheet onClose={() => setOpen(null)} />}
-      {open === 'projects' && <ProjectsSheet onClose={() => setOpen(null)} />}
       {open === 'templates' && <TemplatesSheet onClose={() => setOpen(null)} />}
-      {open === 'limits' && <LimitsSheet onClose={() => setOpen(null)} />}
+      {open === 'reserve' && <ReserveSheet onClose={() => setOpen(null)} />}
       {open === 'security' && <SecuritySheet onClose={() => setOpen(null)} />}
       {open === 'data' && <DataSheet onClose={() => setOpen(null)} />}
     </div>
@@ -53,11 +52,12 @@ function useReorder(path) {
   };
 }
 
-function RowActions({ onUp, onDown, onEdit, onArchive, archived, onDelete }) {
+function RowActions({ onUp, onDown, onAdd, onEdit, onArchive, archived, onDelete }) {
   return (
     <div className="row-actions">
-      {onUp && <button className="icon-btn" onClick={onUp} aria-label="Fel"><ChevronUp size={16} /></button>}
-      {onDown && <button className="icon-btn" onClick={onDown} aria-label="Le"><ChevronDown size={16} /></button>}
+      {onUp !== undefined && <button className="icon-btn" onClick={onUp || undefined} disabled={!onUp} aria-label="Fel"><ChevronUp size={16} /></button>}
+      {onDown !== undefined && <button className="icon-btn" onClick={onDown || undefined} disabled={!onDown} aria-label="Le"><ChevronDown size={16} /></button>}
+      {onAdd && <button className="icon-btn" onClick={onAdd} aria-label="Alkategória hozzáadása" title="Alkategória hozzáadása"><Plus size={16} /></button>}
       {onEdit && <button className="icon-btn" onClick={onEdit} aria-label="Szerkesztés"><Pencil size={15} /></button>}
       {onArchive && <button className="icon-btn" onClick={onArchive} aria-label={archived ? 'Visszaállítás' : 'Archiválás'}>{archived ? <ArchiveRestore size={15} /> : <Archive size={15} />}</button>}
       {onDelete && <button className="icon-btn danger-text" onClick={onDelete} aria-label="Törlés"><Trash2 size={15} /></button>}
@@ -65,113 +65,127 @@ function RowActions({ onUp, onDown, onEdit, onArchive, archived, onDelete }) {
   );
 }
 
-// ── Kategóriák
+// ── Kategóriafa
 function CategoriesSheet({ onClose }) {
-  const { state, mutate } = useApp();
+  const { state } = useApp();
   const [kind, setKind] = useState('expense');
   const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const reorder = useReorder('categories');
-  const list = state.categories.filter((c) => c.kind === kind && !c.isSystem);
+  const own = state.categories.filter((c) => c.kind === kind && !c.isSystem);
+  const rows = flattenTree(own);
+  const kids = childrenMap(own);
+  const siblingsOf = (c) => kids.get(c.parentId != null && own.some((x) => x.id === c.parentId) ? c.parentId : 'root') || [];
   return (
     <Sheet title="Kategóriák" onClose={onClose} tall>
       <Segmented value={kind} onChange={setKind} options={[{ value: 'expense', label: 'Kiadás' }, { value: 'income', label: 'Bevétel' }]} />
-      <div className="edit-list">
-        {list.map((c, i) => (
-          <div key={c.id} className={`edit-row ${c.archived ? 'archived' : ''}`}>
-            <span className="rank-icon" style={{ '--c': c.color }}>{c.icon}</span>
-            <span className="grow">{c.name}</span>
-            <RowActions onUp={() => reorder(list, i, -1)} onDown={() => reorder(list, i, 1)} onEdit={() => setEditing(c)}
-              archived={c.archived} onArchive={() => mutate(() => api.put(`/categories/${c.id}`, { archived: !c.archived }))} />
-          </div>
-        ))}
+      <p className="muted small">Bármelyik kategória alá tehetsz alkategóriát, azok alá újabbakat, tetszőleges mélységig. A statisztika a főkategóriákba összesít, onnan lefúrhatsz.</p>
+      <div className="edit-list tree">
+        {rows.map(({ cat: c, depth }) => {
+          const sib = siblingsOf(c);
+          const i = sib.findIndex((x) => x.id === c.id);
+          return (
+            <div key={c.id} className={`edit-row ${c.archived ? 'archived' : ''}`} style={{ '--depth': depth }}>
+              {depth > 0 && <CornerDownRight size={14} className="muted tree-elbow" />}
+              <span className="rank-icon" style={{ '--c': c.color }}>{c.icon}</span>
+              <span className="grow tree-name">{c.name}{c.archived ? <small className="muted"> · archivált</small> : null}{c.txCount ? <small className="muted"> · {c.txCount} tétel</small> : null}</span>
+              <RowActions
+                onUp={i > 0 ? () => reorder(sib, i, -1) : null}
+                onDown={i < sib.length - 1 ? () => reorder(sib, i, 1) : null}
+                onAdd={() => setEditing({ kind, parentId: c.id, icon: c.icon, color: c.color })}
+                onEdit={() => setEditing(c)} />
+            </div>
+          );
+        })}
+        {!rows.length && <p className="muted">Még nincs kategória.</p>}
       </div>
-      <button className="btn ghost full" onClick={() => setEditing({ kind })}><Plus size={16} /> Új kategória</button>
-      {editing && <CategoryEditor item={editing} onClose={() => setEditing(null)} />}
+      <button className="btn ghost full" onClick={() => setEditing({ kind, parentId: null })}><Plus size={16} /> Új főkategória</button>
+      {editing && <CategoryEditor item={editing} onClose={() => setEditing(null)}
+        onDelete={() => { setDeleting(editing); setEditing(null); }} />}
+      {deleting && <CategoryDelete item={deleting} onClose={() => setDeleting(null)} />}
     </Sheet>
   );
 }
 
-function CategoryEditor({ item, onClose }) {
-  const { mutate } = useApp();
+function CategoryEditor({ item, onClose, onDelete }) {
+  const { state, mutate, categoriesById } = useApp();
   const [name, setName] = useState(item.name || '');
+  const [parentId, setParentId] = useState(item.parentId ?? null);
   const [icon, setIcon] = useState(item.icon || EMOJIS[0]);
   const [color, setColor] = useState(item.color || COLORS[0]);
   const [keywords, setKeywords] = useState((item.keywords || []).join(', '));
+  // A saját ága alá nem mozgatható
+  const exclude = item.id ? descendantIds(item.id, state.categories) : undefined;
   const save = async () => {
-    const body = { name, icon, color, keywords, kind: item.kind };
+    const body = { name, icon, color, keywords, parentId, kind: item.kind };
     await mutate(() => (item.id ? api.put(`/categories/${item.id}`, body) : api.post('/categories', body)), 'Mentve');
     onClose();
   };
+  const parent = categoriesById[item.parentId];
+  const title = item.id ? 'Kategória szerkesztése' : parent ? `Új alkategória: ${parent.name} alá` : 'Új főkategória';
   return (
-    <Sheet title={item.id ? 'Kategória szerkesztése' : 'Új kategória'} onClose={onClose}>
+    <Sheet title={title} onClose={onClose} tall>
       <div className="form">
         <Field label="Név"><input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
+        <Field group label="Hová tartozik" hint="Válaszd a Főkategóriát, vagy bármelyik kategóriát (alkategóriát is), ami alá kerüljön">
+          <CategoryPicker kind={item.kind} value={parentId} onChange={setParentId} exclude={exclude} noneLabel="⬆️ Főkategória" />
+        </Field>
         <Field label="Ikon"><div className="icon-grid">{EMOJIS.map((e) => <button type="button" key={e} className={icon === e ? 'on' : ''} onClick={() => setIcon(e)}>{e}</button>)}</div></Field>
         <Field label="Szín"><div className="color-grid">{COLORS.map((c) => <button type="button" key={c} className={color === c ? 'on' : ''} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />)}</div></Field>
         <Field label="Gyorsbeviteli kulcsszavak" hint="Pl. „lidl, spar” – ezekre a szavakra automatikusan ez a kategória lesz kitöltve">
           <input className="input" value={keywords} onChange={(e) => setKeywords(e.target.value)} />
         </Field>
         <button className="btn primary full" disabled={!name.trim()} onClick={save}>Mentés</button>
+        {item.id && (
+          <div className="row gap">
+            <button className="btn ghost grow" onClick={async () => {
+              await mutate(() => api.put(`/categories/${item.id}`, { archived: !item.archived }), item.archived ? 'Visszaállítva' : 'Archiválva – az alkategóriáival együtt rejtve marad a választókban');
+              onClose();
+            }}>{item.archived ? <><ArchiveRestore size={16} /> Visszaállítás</> : <><Archive size={16} /> Archiválás</>}</button>
+            <button className="btn ghost danger-text grow" onClick={onDelete}><Trash2 size={16} /> Törlés</button>
+          </div>
+        )}
       </div>
     </Sheet>
   );
 }
 
-// ── Projektek és címkék
-function ProjectsSheet({ onClose }) {
-  const { state, mutate } = useApp();
-  const [newName, setNewName] = useState('');
-  const [rename, setRename] = useState(null); // { kind, id, name }
-  const add = async () => {
-    if (!newName.trim()) return;
-    await mutate(() => api.post('/projects', { name: newName }), 'Projekt hozzáadva');
-    setNewName('');
-  };
-  const saveRename = async () => {
-    const path = rename.kind === 'tag' ? 'tags' : 'projects';
-    await mutate(() => api.put(`/${path}/${rename.id}`, { name: rename.name }), rename.kind === 'tag' ? 'Címke frissítve (azonos név esetén összevonva)' : 'Átnevezve');
-    setRename(null);
+/** Törlés: az alkategóriák egy szinttel feljebb lépnek; a tételeket át kell tenni máshová (vagy kategória nélkül hagyni). */
+function CategoryDelete({ item, onClose }) {
+  const { state, mutate, categoriesById, categoryLabel } = useApp();
+  const [target, setTarget] = useState(item.txCount ? (item.parentId ?? undefined) : 'none');
+  const [busy, setBusy] = useState(false);
+  const children = state.categories.filter((c) => c.parentId === item.id);
+  const parent = categoriesById[item.parentId];
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await mutate(() => api.del(`/categories/${item.id}?moveTo=${target}`), 'Kategória törölve');
+      onClose();
+    } catch { /* toast */ } finally { setBusy(false); }
   };
   return (
-    <Sheet title="Projektek és címkék" onClose={onClose} tall>
-      <SectionTitle>Side-hustle projektek</SectionTitle>
-      <div className="edit-list">
-        {state.projects.map((p) => (
-          <div key={p.id} className={`edit-row ${p.archived ? 'archived' : ''}`}>
-            <i className="dot" style={{ background: p.color }} />
-            <span className="grow">{p.name}{p.archived && <small className="muted"> · lezárt</small>}</span>
-            <RowActions onEdit={() => setRename({ kind: 'project', id: p.id, name: p.name })} archived={p.archived}
-              onArchive={() => mutate(() => api.put(`/projects/${p.id}`, { archived: !p.archived }))} />
+    <Sheet title={`„${item.name}” törlése`} onClose={onClose} tall>
+      <div className="form">
+        {children.length > 0 && (
+          <div className="callout">
+            <span>
+              {children.length} alkategóriája ({children.map((c) => c.name).join(', ')}) megmarad, és{' '}
+              {parent ? <>a(z) <b>{categoryLabel(parent.id)}</b> alá kerül.</> : 'főkategória lesz.'}
+            </span>
           </div>
-        ))}
-      </div>
-      <div className="row gap">
-        <input className="input" placeholder="Új projekt, pl. Grafikai munkák" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
-        <button className="btn primary" onClick={add}><Plus size={16} /></button>
-      </div>
-
-      <SectionTitle>Címkék</SectionTitle>
-      {state.tags.length ? (
-        <div className="edit-list">
-          {state.tags.map((t) => (
-            <div key={t.id} className="edit-row">
-              <span className="grow">#{t.name} <small className="muted">· {t.uses} tétel</small></span>
-              <RowActions onEdit={() => setRename({ kind: 'tag', id: t.id, name: t.name })}
-                onDelete={() => mutate(() => api.del(`/tags/${t.id}`), 'Címke törölve')} />
-            </div>
-          ))}
+        )}
+        {item.txCount > 0 ? (
+          <Field group label={`${item.txCount} tétel tartozik ide – hová kerüljenek?`}>
+            <CategoryPicker kind={item.kind} value={target === 'none' ? null : (target ?? -1)}
+              onChange={(id) => setTarget(id == null ? 'none' : id)} exclude={new Set([item.id])} noneLabel="Kategória nélkül" />
+          </Field>
+        ) : <p className="muted">Ehhez a kategóriához nem tartozik tétel.</p>}
+        <div className="row gap">
+          <button className="btn ghost" onClick={onClose}>Mégse</button>
+          <button className="btn danger grow" disabled={busy || target === undefined} onClick={remove}><Trash2 size={16} /> Törlés</button>
         </div>
-      ) : <p className="muted">Még nincs címke. Rögzítéskor adhatsz hozzá, pl. #egyetem.</p>}
-      <p className="muted small">Tipp: ha egy címkét egy már létező nevére nevezel át, a kettő összevonódik.</p>
-
-      {rename && (
-        <Sheet title={rename.kind === 'tag' ? 'Címke átnevezése / összevonása' : 'Projekt átnevezése'} onClose={() => setRename(null)}>
-          <div className="form">
-            <input className="input" value={rename.name} onChange={(e) => setRename({ ...rename, name: e.target.value })} autoFocus />
-            <button className="btn primary full" onClick={saveRename}>Mentés</button>
-          </div>
-        </Sheet>
-      )}
+      </div>
     </Sheet>
   );
 }
@@ -220,45 +234,26 @@ function TemplateEditor({ item, onClose }) {
         <Field label="Név"><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="pl. Kávé" /></Field>
         <Field label="Ikon"><div className="icon-grid">{['☕', '🍦', '🚌', '🍕', '🥐', '🍺', '🛒', '🧴', '🎬', '💼', '⚡', '🚕'].map((e) => <button type="button" key={e} className={emoji === e ? 'on' : ''} onClick={() => setEmoji(e)}>{e}</button>)}</div></Field>
         <Field label="Összeg"><AmountInput value={amount} onChange={setAmount} /></Field>
-        <Field label="Alapértelmezett tárca" hint="Tárca nélkül a sablon piszkozatként ment"><WalletPicker value={walletId} onChange={setWalletId} allowNone /></Field>
-        <Field label="Kategória"><CategoryPicker kind={type} value={categoryId} onChange={setCategoryId} /></Field>
+        <Field group label="Alapértelmezett tárca" hint="Tárca nélkül a sablon piszkozatként ment"><WalletPicker value={walletId} onChange={setWalletId} allowNone /></Field>
+        <Field group label="Kategória"><CategoryPicker kind={type} value={categoryId} onChange={setCategoryId} /></Field>
         <button className="btn primary full" disabled={!name.trim() || !Number(amount)} onClick={save}>Mentés</button>
       </div>
     </Sheet>
   );
 }
 
-// ── Keretek
-function LimitsSheet({ onClose }) {
+// ── Irattartó célszint
+function ReserveSheet({ onClose }) {
   const { state, mutate } = useApp();
-  const s = state.settings;
-  const [reserveTarget, setReserveTarget] = useState(String(s.reserveTarget));
-  const [enabled, setEnabled] = useState(s.spendingEnabled);
-  const [period, setPeriod] = useState(s.spendingPeriod);
-  const [amount, setAmount] = useState(String(s.spendingAmount));
-  const [walletId, setWalletId] = useState(s.spendingWalletId);
+  const [reserveTarget, setReserveTarget] = useState(String(state.settings.reserveTarget));
   const save = async () => {
-    await mutate(() => api.put('/settings', {
-      reserveTarget: Number(reserveTarget), spendingEnabled: enabled, spendingPeriod: period,
-      spendingAmount: Number(amount), spendingWalletId: walletId,
-    }), 'Beállítások mentve');
+    await mutate(() => api.put('/settings', { reserveTarget: Number(reserveTarget) }), 'Beállítások mentve');
     onClose();
   };
   return (
-    <Sheet title="Keretek és tárca-szabályok" onClose={onClose} tall>
+    <Sheet title="Irattartó célszint" onClose={onClose}>
       <div className="form">
         <Field label="Irattartó minimum célösszeg" hint="Ez alatt figyelmeztetés jelenik meg a Főoldalon"><AmountInput value={reserveTarget} onChange={setReserveTarget} /></Field>
-        <label className="switch-row">
-          <span>Költési keret bekapcsolva</span>
-          <input type="checkbox" className="switch" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-        </label>
-        {enabled && (
-          <>
-            <Segmented value={period} onChange={setPeriod} options={[{ value: 'day', label: 'Napi keret' }, { value: 'week', label: 'Heti keret' }]} />
-            <Field label={period === 'day' ? 'Keret / nap' : 'Keret / hét'}><AmountInput value={amount} onChange={setAmount} /></Field>
-            <Field label="Melyik zsebre vonatkozik"><WalletPicker value={walletId} onChange={setWalletId} includeEnvelopes={false} /></Field>
-          </>
-        )}
         <button className="btn primary full" onClick={save}>Mentés</button>
       </div>
     </Sheet>

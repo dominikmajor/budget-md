@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { TrendingDown, TrendingUp, Table2, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { TrendingDown, TrendingUp, Table2, BarChart3, ChevronRight } from 'lucide-react';
+import { childrenMap, pathOf, rollup } from '@budget/shared/categories';
 import { useApp } from '../store.jsx';
 import { api, qs } from '../api.js';
 import { Card, Chip, Empty, Money, Progress, SectionTitle } from '../components/ui.jsx';
-import TxRow from '../components/TxRow.jsx';
-import { dateKey, formatHUF, formatNumber } from '../lib/util.js';
+import { dateKey, formatHUF } from '../lib/util.js';
 import { BP, useMediaQuery } from '../lib/useMediaQuery.js';
 
 const PRESETS = [
@@ -40,12 +41,10 @@ function bucketLabel(key, bucket) {
 const kFormat = (v) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}e` : v);
 
 export default function Analytics() {
-  const { version, hidden, state } = useApp();
+  const { version, hidden } = useApp();
   const [preset, setPreset] = useState('month');
   const [custom, setCustom] = useState(presetRange('month'));
   const [stats, setStats] = useState(null);
-  const [tag, setTag] = useState(null);
-  const [tagTx, setTagTx] = useState(null);
   const [asTable, setAsTable] = useState(false);
   const isTablet = useMediaQuery(BP.tablet);
 
@@ -56,12 +55,6 @@ export default function Analytics() {
     api.get('/stats' + qs(range)).then(setStats);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.from, range.to, version]);
-
-  useEffect(() => {
-    if (!tag) return setTagTx(null);
-    api.get('/transactions' + qs({ ...range, tag, status: 'final' })).then(setTagTx);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tag, range.from, range.to, version]);
 
   const chartData = useMemo(
     () => (stats?.cashflow || []).map((r) => ({ ...r, label: bucketLabel(r.bucket < stats.from ? stats.from : r.bucket, stats.bucket) })),
@@ -121,126 +114,169 @@ export default function Analytics() {
           </Card>
 
           <div className="stats-grid">
-          <section className="stack">
-          <SectionTitle>Side-hustle és bevételi források</SectionTitle>
-          <Card>
-            {stats.incomeSources.length ? (
-              <>
-                <div className="bars">
-                  {stats.incomeSources.map((s) => (
-                    <div key={s.name} className="bar-row">
-                      <div className="row between"><span><i className="dot" style={{ background: s.color }} /> {s.name} <span className="muted small">· {s.count} db</span></span><Money value={s.amount} /></div>
-                      <Progress value={s.amount} max={stats.incomeSources[0].amount} tone="pos" thin />
-                    </div>
-                  ))}
-                </div>
+            <section className="stack">
+              <SectionTitle>Bevételek kategóriánként</SectionTitle>
+              <CategoryBreakdown type="income" stats={stats}>
                 <div className="mini-stats">
                   <div><span>Átlag / tranzakció</span><Money value={stats.incomeFrequency.avgPerTransaction} /></div>
                   <div><span>Átlag / hét</span><Money value={stats.incomeFrequency.avgPerWeek} /></div>
                   <div><span>Gyakoriság</span><b>{stats.incomeFrequency.avgGapDays == null ? '—' : stats.incomeFrequency.avgGapDays < 1 ? 'naponta többször' : `${String(stats.incomeFrequency.avgGapDays).replace('.', ',')} naponta`}</b></div>
                 </div>
-              </>
-            ) : <Empty icon="💼" title="Nincs bevétel ebben az időszakban" />}
-          </Card>
-          </section>
-
-          <section className="stack">
-          <SectionTitle>Kiadások kategóriánként</SectionTitle>
-          <Card>
-            {stats.categories.length ? (
-              <>
-                <div className="donut-wrap">
-                  <ResponsiveContainer width="100%" height={isTablet ? 230 : 190}>
-                    <PieChart>
-                      <Pie data={stats.categories} dataKey="amount" nameKey="name" innerRadius="64%" outerRadius="92%" paddingAngle={2} stroke="var(--surface)" strokeWidth={2} cornerRadius={4}>
-                        {stats.categories.map((c) => <Cell key={c.name} fill={c.color} />)}
-                      </Pie>
-                      <Tooltip content={<PieTip hidden={hidden} />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="donut-center"><span>Összesen</span><Money value={stats.totals.expense} /></div>
-                </div>
-                <div className="rank">
-                  {stats.categories.map((c) => (
-                    <div key={c.name} className="rank-row">
-                      <span className="rank-icon" style={{ '--c': c.color }}>{c.icon}</span>
-                      <span className="grow">{c.name}<small className="muted"> {Math.round(c.share * 100)}%</small></span>
-                      {c.change != null && (
-                        <span className={`change ${c.change > 0 ? 'neg' : 'pos'}`}>
-                          {c.change > 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />} {c.change > 0 ? '+' : ''}{Math.round(c.change * 100)}%
-                        </span>
-                      )}
-                      <Money value={c.amount} />
-                    </div>
-                  ))}
-                </div>
-                <p className="muted small">A változás az előző, azonos hosszú időszakhoz képest.</p>
-              </>
-            ) : <Empty icon="🧾" title="Nincs kiadás ebben az időszakban" />}
-          </Card>
-          </section>
-
-          {(stats.tags.length > 0 || state.tags.length > 0) && (
-            <section className="stack">
-              <SectionTitle>Címkék</SectionTitle>
-              <Card>
-                <div className="picker">
-                  {stats.tags.map((t) => (
-                    <Chip key={t.name} active={tag === t.name} onClick={() => setTag(tag === t.name ? null : t.name)}>
-                      #{t.name} <small className="muted">{t.count}</small>
-                    </Chip>
-                  ))}
-                  {!stats.tags.length && <span className="muted small">Ebben az időszakban nincs címkézett tétel.</span>}
-                </div>
-                {tag && (() => {
-                  const t = stats.tags.find((x) => x.name === tag);
-                  return (
-                    <>
-                      <div className="mini-stats">
-                        <div><span>Bevétel</span><Money value={t?.income || 0} className="pos" /></div>
-                        <div><span>Kiadás</span><Money value={t?.expense || 0} className="neg" /></div>
-                      </div>
-                      <div className="list-card flat">{tagTx ? tagTx.map((x) => <TxRow key={x.id} tx={x} showDate />) : <div className="loading" />}</div>
-                    </>
-                  );
-                })()}
-              </Card>
+              </CategoryBreakdown>
             </section>
-          )}
 
-          {stats.limit && (
             <section className="stack">
-              <SectionTitle>Költős keret teljesítmény</SectionTitle>
-              <Card>
-                <p className="lead">
-                  {stats.limit.closedCount
-                    ? `Az elmúlt ${stats.limit.closedCount} ${stats.limit.period === 'week' ? 'hétből' : 'napból'} ${stats.limit.withinCount} ${stats.limit.period === 'week' ? 'héten' : 'napon'} kereten belül maradtál.`
-                    : 'Még nincs lezárt időszak.'}
-                </p>
-                <div className="limit-bars">
-                  {stats.limit.periods.map((p, i) => {
-                    const last = i === stats.limit.periods.length - 1;
-                    const h = Math.min(100, (p.spent / Math.max(stats.limit.limit, 1)) * 100);
-                    return (
-                      <div key={p.start} className="limit-col" title={`${p.start}: ${formatHUF(p.spent)}`}>
-                        <div className="limit-track">
-                          <div className={`limit-fill ${p.within ? 'ok' : 'over'} ${last ? 'current' : ''}`} style={{ height: `${Math.max(h, 3)}%` }} />
-                        </div>
-                        <span className="small muted">{last ? 'most' : bucketLabel(p.start, stats.limit.period === 'week' ? 'week' : 'day')}</span>
-                        <span className="small">{hidden ? '•••' : formatNumber(p.spent)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="muted small">Keret: {formatHUF(stats.limit.limit)} / {stats.limit.period === 'week' ? 'hét' : 'nap'}</p>
-              </Card>
+              <SectionTitle>Kiadások kategóriánként</SectionTitle>
+              <CategoryBreakdown type="expense" stats={stats} donut />
             </section>
-          )}
           </div>
         </>
       )}
     </div>
   );
+}
+
+/**
+ * Kategóriafa szerinti bontás: a főkategóriák az alkategóriáik összegét is tartalmazzák,
+ * egy sorra koppintva lefúrhatsz a következő szintre (alkategória nélkülinél a tételekhez ugrik).
+ */
+function CategoryBreakdown({ type, stats, donut, children }) {
+  const { state, categoriesById, hidden } = useApp();
+  const navigate = useNavigate();
+  const isTablet = useMediaQuery(BP.tablet);
+  const [focus, setFocus] = useState(null);
+
+  const data = useMemo(() => {
+    const cats = state.categories.filter((c) => c.kind === type);
+    const direct = new Map();
+    const count = new Map();
+    let none = 0;
+    let noneCount = 0;
+    for (const r of stats.categoryTotals) {
+      if (r.type !== type) continue;
+      if (r.id == null || !categoriesById[r.id]) { none += r.amount; noneCount += r.count; continue; }
+      direct.set(r.id, r.amount);
+      count.set(r.id, r.count);
+    }
+    const prevDirect = new Map(stats.previousTotals.filter((r) => r.type === type && r.id != null).map((r) => [r.id, r.amount]));
+    return {
+      cats,
+      direct,
+      kids: childrenMap(cats),
+      rolled: rollup(cats, direct),
+      rolledCount: rollup(cats, count),
+      prev: rollup(cats, prevDirect),
+      none,
+      noneCount,
+    };
+  }, [state.categories, categoriesById, stats, type]);
+
+  // Ha a kiválasztott ág eltűnik (pl. másik időszak), vissza a tetejére
+  const focusCat = focus != null && (data.rolled.get(focus) || 0) > 0 ? categoriesById[focus] : null;
+  const base = focusCat ? (data.kids.get(focusCat.id) || []) : (data.kids.get('root') || []);
+  const items = base
+    .map((c) => ({
+      key: c.id, id: c.id, name: c.name, icon: c.icon, color: c.color,
+      amount: data.rolled.get(c.id) || 0,
+      count: data.rolledCount.get(c.id) || 0,
+      previous: data.prev.get(c.id) || 0,
+      drill: (data.kids.get(c.id) || []).some((k) => (data.rolled.get(k.id) || 0) > 0),
+    }))
+    .filter((x) => x.amount > 0);
+  if (focusCat && data.direct.get(focusCat.id)) {
+    items.push({ key: 'self', id: focusCat.id, name: `${focusCat.name} (közvetlenül)`, icon: focusCat.icon, color: focusCat.color,
+      amount: data.direct.get(focusCat.id), count: 0, previous: null, drill: false, self: true });
+  }
+  if (!focusCat && data.none) {
+    items.push({ key: 'none', id: null, name: 'Kategória nélkül', icon: '❔', color: '#64748b', amount: data.none, count: data.noneCount, previous: null, drill: false });
+  }
+  items.sort((a, b) => b.amount - a.amount);
+  // Az alkategóriák gyakran a szülő színét öröklik – az azonos színűeket árnyalatokkal különítjük el
+  const seen = new Map();
+  for (const x of items) {
+    const k = seen.get(x.color) || 0;
+    seen.set(x.color, k + 1);
+    if (k) x.color = mixHex(x.color, k % 2 ? '#ffffff' : '#000000', Math.min(0.6, 0.22 * Math.ceil(k / 2) + 0.1));
+  }
+  const total = focusCat ? (data.rolled.get(focusCat.id) || 0) : items.reduce((s, x) => s + x.amount, 0);
+  const crumbs = focusCat ? pathOf(focusCat.id, categoriesById) : [];
+
+  const open = (x) => {
+    if (x.drill) setFocus(x.id);
+    else if (x.id != null) navigate(`/tranzakciok?kategoria=${x.id}`);
+  };
+
+  if (!total) {
+    return (
+      <Card>
+        <Empty icon={type === 'income' ? '💼' : '🧾'} title={type === 'income' ? 'Nincs bevétel ebben az időszakban' : 'Nincs kiadás ebben az időszakban'} />
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      {crumbs.length > 0 && (
+        <div className="crumbs">
+          <button className="link-btn" onClick={() => setFocus(null)}>Összes</button>
+          {crumbs.map((c, i) => (
+            <span key={c.id} className="crumb">
+              <ChevronRight size={14} className="muted" />
+              {i < crumbs.length - 1
+                ? <button className="link-btn" onClick={() => setFocus(c.id)}>{c.name}</button>
+                : <b>{c.icon} {c.name}</b>}
+            </span>
+          ))}
+        </div>
+      )}
+      {donut && (
+        <div className="donut-wrap">
+          <ResponsiveContainer width="100%" height={isTablet ? 230 : 190}>
+            <PieChart>
+              <Pie data={items.map((x) => ({ ...x, share: x.amount / total }))} dataKey="amount" nameKey="name" innerRadius="64%" outerRadius="92%" paddingAngle={2} stroke="var(--surface)" strokeWidth={2} cornerRadius={4}>
+                {items.map((x) => <Cell key={x.key} fill={x.color} />)}
+              </Pie>
+              <Tooltip content={<PieTip hidden={hidden} />} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="donut-center"><span>{focusCat ? focusCat.name : 'Összesen'}</span><Money value={total} /></div>
+        </div>
+      )}
+      {!donut && focusCat && <div className="row between breakdown-total"><span className="muted">{focusCat.name} összesen</span><Money value={total} /></div>}
+      <div className="rank">
+        {items.map((x) => {
+          const change = x.previous ? (x.amount - x.previous) / x.previous : null;
+          const clickable = x.drill || (x.id != null);
+          return (
+            <button key={x.key} type="button" className={`rank-row ${clickable ? 'clickable' : ''}`} onClick={() => open(x)} disabled={!clickable}>
+              <span className="rank-icon" style={{ '--c': x.color }}>{x.icon}</span>
+              <span className="grow rank-main">
+                <span>{x.name}<small className="muted"> {Math.round((x.amount / total) * 100)}%{x.count ? ` · ${x.count} db` : ''}</small></span>
+                {!donut && <Progress value={x.amount} max={items[0].amount} tone={type === 'income' ? 'pos' : 'neg'} thin />}
+              </span>
+              {change != null && (
+                <span className={`change ${(change > 0) === (type === 'expense') ? 'neg' : 'pos'}`}>
+                  {change > 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />} {change > 0 ? '+' : ''}{Math.round(change * 100)}%
+                </span>
+              )}
+              <Money value={x.amount} />
+              {x.drill ? <ChevronRight size={16} className="muted" /> : <span className="chev-space" />}
+            </button>
+          );
+        })}
+      </div>
+      {children && !focusCat && children}
+      <p className="muted small">A főkategóriák az alkategóriáik összegét is tartalmazzák – koppints egy sorra a lefúráshoz. A változás az előző, azonos hosszú időszakhoz képest.</p>
+    </Card>
+  );
+}
+
+/** Két #rrggbb szín keverése (t = a második aránya) */
+function mixHex(a, b, t) {
+  const p = (h) => (/^#[0-9a-f]{6}$/i.test(h) ? [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) : null);
+  const x = p(a); const y = p(b);
+  if (!x || !y) return a;
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
 }
 
 function ChartTip({ active, payload, label, hidden }) {

@@ -17,10 +17,6 @@ export function publicSettings(s) {
     pinLength: s.pin_length,
     autolockMinutes: s.autolock_minutes,
     reserveTarget: s.reserve_target,
-    spendingEnabled: s.spending_enabled,
-    spendingPeriod: s.spending_period,
-    spendingAmount: s.spending_amount,
-    spendingWalletId: s.spending_wallet_id,
   };
 }
 
@@ -28,21 +24,14 @@ export async function updateSettings(db, input) {
   const map = {
     autolockMinutes: 'autolock_minutes',
     reserveTarget: 'reserve_target',
-    spendingEnabled: 'spending_enabled',
-    spendingPeriod: 'spending_period',
-    spendingAmount: 'spending_amount',
-    spendingWalletId: 'spending_wallet_id',
   };
   const sets = [];
   const vals = [];
   for (const [k, col] of Object.entries(map)) {
     if (input[k] === undefined) continue;
     let v = input[k];
-    if (['autolockMinutes', 'reserveTarget', 'spendingAmount'].includes(k)) {
-      v = Math.round(Number(v));
-      if (!Number.isFinite(v) || v < 0) throw bad('Érvénytelen szám: ' + k);
-    }
-    if (k === 'spendingPeriod' && !['day', 'week'].includes(v)) throw bad('Érvénytelen keret-időszak');
+    v = Math.round(Number(v));
+    if (!Number.isFinite(v) || v < 0) throw bad('Érvénytelen szám: ' + k);
     vals.push(v);
     sets.push(`${col} = $${vals.length}`);
   }
@@ -244,29 +233,15 @@ function normalizeInput(input, existing = null) {
     walletId,
     toWalletId,
     categoryId: type === 'transfer' ? null : int(merged.categoryId),
-    projectId: type === 'income' ? int(merged.projectId) : null,
     name: String(merged.name || '').trim().slice(0, 200),
     note: String(merged.note || '').slice(0, 2000),
     isCorrection: !!merged.isCorrection,
     occurredAt: merged.occurredAt ? new Date(merged.occurredAt) : new Date(),
-    tags: Array.isArray(merged.tags) ? merged.tags : [],
   };
 }
 
 function stripUndefined(o) {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
-}
-
-async function setTags(db, txId, tags) {
-  await db.query('DELETE FROM transaction_tags WHERE transaction_id = $1', [txId]);
-  const names = [...new Set(tags.map((t) => String(t).replace(/^#/, '').trim().toLowerCase()).filter(Boolean))];
-  for (const name of names) {
-    const { rows } = await db.query(
-      `INSERT INTO tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id`,
-      [name],
-    );
-    await db.query('INSERT INTO transaction_tags VALUES ($1, $2) ON CONFLICT DO NOTHING', [txId, rows[0].id]);
-  }
 }
 
 export async function createTransaction(db, input) {
@@ -275,20 +250,19 @@ export async function createTransaction(db, input) {
   if (input.receipt) receipt = parseDataUrl(input.receipt);
   const { rows } = await db.query(
     `INSERT INTO transactions
-       (type, status, amount, wallet_id, to_wallet_id, category_id, project_id, name, note,
+       (type, status, amount, wallet_id, to_wallet_id, category_id, name, note,
         is_correction, occurred_at, receipt_mime, receipt_data)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
-    [t.type, t.status, t.amount, t.walletId, t.toWalletId, t.categoryId, t.projectId, t.name, t.note,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+    [t.type, t.status, t.amount, t.walletId, t.toWalletId, t.categoryId, t.name, t.note,
       t.isCorrection, t.occurredAt, receipt?.mime ?? null, receipt?.data ?? null],
   );
-  await setTags(db, rows[0].id, t.tags);
   return rows[0].id;
 }
 
 export async function updateTransaction(db, id, input) {
   const current = await getTransaction(db, id);
   const t = normalizeInput(input, current);
-  const vals = [t.type, t.status, t.amount, t.walletId, t.toWalletId, t.categoryId, t.projectId, t.name,
+  const vals = [t.type, t.status, t.amount, t.walletId, t.toWalletId, t.categoryId, t.name,
     t.note, t.isCorrection, t.occurredAt, id];
   let receiptSql = '';
   if (input.receipt === null) {
@@ -300,11 +274,10 @@ export async function updateTransaction(db, id, input) {
   }
   await db.query(
     `UPDATE transactions SET type=$1, status=$2, amount=$3, wallet_id=$4, to_wallet_id=$5, category_id=$6,
-       project_id=$7, name=$8, note=$9, is_correction=$10, occurred_at=$11, updated_at=now() ${receiptSql}
-     WHERE id=$12`,
+       name=$7, note=$8, is_correction=$9, occurred_at=$10, updated_at=now() ${receiptSql}
+     WHERE id=$11`,
     vals,
   );
-  if (input.tags !== undefined) await setTags(db, id, t.tags);
 }
 
 export async function deleteTransaction(db, id) {
@@ -330,11 +303,9 @@ export async function approveTransactions(db, ids) {
 }
 
 const TX_SELECT = `
-  SELECT t.id, t.type, t.status, t.amount, t.wallet_id, t.to_wallet_id, t.category_id, t.project_id,
+  SELECT t.id, t.type, t.status, t.amount, t.wallet_id, t.to_wallet_id, t.category_id,
          t.name, t.note, t.is_correction, t.occurred_at, t.created_at, t.updated_at,
-         (t.receipt_data IS NOT NULL) AS has_receipt,
-         COALESCE(ARRAY(SELECT g.name FROM transaction_tags tt JOIN tags g ON g.id = tt.tag_id
-                        WHERE tt.transaction_id = t.id ORDER BY g.name), '{}') AS tags
+         (t.receipt_data IS NOT NULL) AS has_receipt
   FROM transactions t`;
 
 function toTx(r) {
@@ -346,7 +317,6 @@ function toTx(r) {
     walletId: r.wallet_id,
     toWalletId: r.to_wallet_id,
     categoryId: r.category_id,
-    projectId: r.project_id,
     name: r.name,
     note: r.note,
     isCorrection: r.is_correction,
@@ -354,7 +324,6 @@ function toTx(r) {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     hasReceipt: r.has_receipt,
-    tags: r.tags,
   };
 }
 
@@ -380,9 +349,14 @@ export async function listTransactions(db, f = {}) {
   if (f.wallet === 'envelopes') where.push(`(t.wallet_id IN (SELECT id FROM wallets WHERE kind = 'envelope') OR t.to_wallet_id IN (SELECT id FROM wallets WHERE kind = 'envelope'))`);
   else if (f.wallet) add('(t.wallet_id = ? OR t.to_wallet_id = ?)', int(f.wallet));
   if (f.type) add('t.type = ?', f.type);
-  if (f.category) add('t.category_id = ?', int(f.category));
-  if (f.project) add('t.project_id = ?', int(f.project));
-  if (f.tag) add('EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags g ON g.id = tt.tag_id WHERE tt.transaction_id = t.id AND g.name = ?)', String(f.tag).replace(/^#/, '').toLowerCase());
+  // A kategória-szűrő az összes alkategóriát is tartalmazza
+  if (f.category) {
+    add(`t.category_id IN (
+      WITH RECURSIVE sub AS (
+        SELECT id FROM categories WHERE id = ?
+        UNION SELECT c.id FROM categories c JOIN sub ON c.parent_id = sub.id
+      ) SELECT id FROM sub)`, int(f.category));
+  }
   if (f.receipt === 'true' || f.receipt === true) where.push('t.receipt_data IS NOT NULL');
   if (f.from) add(`t.occurred_at >= (?::date AT TIME ZONE '${TZ}')`, f.from);
   if (f.to) add(`t.occurred_at < ((?::date + 1) AT TIME ZONE '${TZ}')`, f.to);
@@ -393,37 +367,6 @@ export async function listTransactions(db, f = {}) {
     ORDER BY t.occurred_at DESC, t.id DESC LIMIT ${limit} OFFSET ${offset}`;
   const { rows } = await db.query(sql, vals);
   return rows.map(toTx);
-}
-
-// ───────────────────────── Költős keret ─────────────────────────
-
-export async function getSpending(db, settings) {
-  if (!settings.spending_enabled || !settings.spending_wallet_id) return null;
-  const period = settings.spending_period;
-  const { rows } = await db.query(
-    `WITH bounds AS (
-       SELECT (date_trunc($2, now() AT TIME ZONE $1) AT TIME ZONE $1) AS start_at,
-              ((date_trunc($2, now() AT TIME ZONE $1) + ('1 ' || $2)::interval) AT TIME ZONE $1) AS end_at
-     )
-     SELECT COALESCE(SUM(t.amount), 0) AS spent, b.start_at, b.end_at
-     FROM bounds b
-     LEFT JOIN transactions t ON t.type = 'expense' AND NOT t.is_correction
-       AND t.wallet_id = $3 AND t.occurred_at >= b.start_at AND t.occurred_at < b.end_at
-     GROUP BY b.start_at, b.end_at`,
-    [TZ, period, settings.spending_wallet_id],
-  );
-  const spent = rows[0].spent;
-  const limit = settings.spending_amount;
-  return {
-    period,
-    walletId: settings.spending_wallet_id,
-    limit,
-    spent,
-    remaining: limit - spent,
-    ratio: limit > 0 ? spent / limit : 0,
-    periodStart: rows[0].start_at,
-    periodEnd: rows[0].end_at,
-  };
 }
 
 // ───────────────────────── Teljes állapot (egy hívás az egész UI-nak) ─────────────────────────
@@ -442,18 +385,9 @@ export async function getCategoryMemory(db) {
 
 export async function getState(db) {
   const settings = await getSettings(db);
-  const [wallets, categories, projects, tags, templates, drafts, recent, memory, spending] = await all(db, [
+  const [wallets, categories, templates, drafts, recent, memory] = await all(db, [
     () => getWallets(db),
-    () => db.query('SELECT * FROM categories ORDER BY kind, archived, sort_order, id').then((r) => r.rows.map((c) => ({
-      id: c.id, name: c.name, kind: c.kind, icon: c.icon, color: c.color, keywords: c.keywords,
-      isSystem: c.is_system, archived: c.archived, sortOrder: c.sort_order,
-    }))),
-    () => db.query('SELECT * FROM projects ORDER BY archived, sort_order, id').then((r) => r.rows.map((p) => ({
-      id: p.id, name: p.name, color: p.color, archived: p.archived, sortOrder: p.sort_order,
-    }))),
-    () => db.query(`SELECT g.id, g.name, COUNT(tt.transaction_id)::int AS uses
-              FROM tags g LEFT JOIN transaction_tags tt ON tt.tag_id = g.id
-              GROUP BY g.id ORDER BY uses DESC, g.name`).then((r) => r.rows),
+    () => getCategories(db),
     () => db.query('SELECT * FROM templates ORDER BY sort_order, id').then((r) => r.rows.map((t) => ({
       id: t.id, name: t.name, emoji: t.emoji, type: t.type, amount: t.amount,
       walletId: t.wallet_id, categoryId: t.category_id, sortOrder: t.sort_order,
@@ -461,7 +395,6 @@ export async function getState(db) {
     () => db.query(`SELECT COUNT(*)::int AS n FROM transactions WHERE status = 'draft'`).then((r) => r.rows[0].n),
     () => listTransactions(db, { limit: 8 }),
     () => getCategoryMemory(db),
-    () => getSpending(db, settings),
   ]);
   const active = wallets.filter((w) => !w.archived || w.balance !== 0);
   const reserveTarget = settings.reserve_target;
@@ -477,13 +410,136 @@ export async function getState(db) {
     wallets,
     summary: summarize(active),
     categories,
-    projects,
-    tags,
     templates,
     draftCount: drafts,
     recent,
     memory,
-    spending,
     alerts,
   };
+}
+
+// ───────────────────────── Kategóriafa ─────────────────────────
+
+export async function getCategories(db) {
+  const { rows } = await db.query(
+    `SELECT c.*, COALESCE(u.n, 0)::int AS tx_count
+     FROM categories c
+     LEFT JOIN (SELECT category_id, COUNT(*) AS n FROM transactions GROUP BY category_id) u ON u.category_id = c.id
+     ORDER BY c.kind, c.sort_order, c.id`,
+  );
+  return rows.map((c) => ({
+    id: c.id, name: c.name, kind: c.kind, parentId: c.parent_id, icon: c.icon, color: c.color,
+    keywords: c.keywords, isSystem: c.is_system, archived: c.archived, sortOrder: c.sort_order,
+    txCount: c.tx_count,
+  }));
+}
+
+async function loadCategory(db, id) {
+  const { rows } = await db.query('SELECT * FROM categories WHERE id = $1', [id]);
+  if (!rows[0]) throw notFound('A kategória nem található');
+  return rows[0];
+}
+
+/** A szülő ellenőrzése: létezik, azonos típusú, nem rendszer-kategória, és nem a saját leszármazottja. */
+async function checkParent(db, parentId, kind, selfId = null) {
+  if (parentId == null) return null;
+  const parent = await loadCategory(db, parentId);
+  if (parent.is_system) throw bad('Rendszer-kategória alá nem tehető alkategória');
+  if (parent.kind !== kind) throw bad('Kiadás-kategória csak kiadás-, bevétel-kategória csak bevétel-kategória alá kerülhet');
+  if (selfId != null) {
+    const { rows } = await db.query(
+      `WITH RECURSIVE up AS (
+         SELECT id, parent_id FROM categories WHERE id = $1
+         UNION SELECT c.id, c.parent_id FROM categories c JOIN up ON c.id = up.parent_id
+       ) SELECT 1 FROM up WHERE id = $2`,
+      [parentId, selfId],
+    );
+    if (rows.length) throw bad('Egy kategória nem kerülhet a saját alkategóriája alá');
+  }
+  return parent;
+}
+
+const nextSort = async (db, parentId, kind) =>
+  (await db.query(
+    'SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM categories WHERE parent_id IS NOT DISTINCT FROM $1 AND kind = $2',
+    [parentId, kind],
+  )).rows[0].n;
+
+function cleanCatKeywords(v) {
+  return [...new Set((Array.isArray(v) ? v : String(v || '').split(',')).map((k) => k.trim().toLowerCase()).filter(Boolean))];
+}
+
+export async function createCategory(db, input) {
+  const name = String(input.name || '').trim();
+  if (!name) throw bad('Adj nevet a kategóriának');
+  const parentId = int(input.parentId);
+  let kind = input.kind;
+  if (parentId != null) kind = (await loadCategory(db, parentId)).kind; // alkategória örökli a típust
+  if (!['expense', 'income'].includes(kind)) throw bad('Érvénytelen kategória-típus');
+  const parent = await checkParent(db, parentId, kind);
+  const { rows } = await db.query(
+    `INSERT INTO categories (name, kind, icon, color, keywords, parent_id, sort_order)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [name, kind, input.icon || parent?.icon || '🏷️', input.color || parent?.color || '#8b8fa3',
+      cleanCatKeywords(input.keywords), parentId, await nextSort(db, parentId, kind)],
+  );
+  return rows[0].id;
+}
+
+export async function updateCategory(db, id, input) {
+  const cur = await loadCategory(db, id);
+  const sets = [];
+  const vals = [];
+  const set = (col, v) => { vals.push(v); sets.push(`${col} = $${vals.length}`); };
+  if (input.name !== undefined) {
+    const name = String(input.name).trim();
+    if (!name) throw bad('Adj nevet a kategóriának');
+    set('name', name);
+  }
+  if (input.icon !== undefined) set('icon', String(input.icon));
+  if (input.color !== undefined) set('color', String(input.color));
+  if (input.keywords !== undefined) set('keywords', cleanCatKeywords(input.keywords));
+  if (input.archived !== undefined) set('archived', !!input.archived);
+  if (input.parentId !== undefined) {
+    const parentId = int(input.parentId);
+    if (parentId !== cur.parent_id) {
+      if (cur.is_system) throw bad('A rendszer-kategória nem mozgatható');
+      await checkParent(db, parentId, cur.kind, id);
+      set('parent_id', parentId);
+      set('sort_order', await nextSort(db, parentId, cur.kind));
+    }
+  }
+  if (!sets.length) return;
+  vals.push(id);
+  await db.query(`UPDATE categories SET ${sets.join(', ')} WHERE id = $${vals.length}`, vals);
+}
+
+/**
+ * Kategória törlése.
+ *  - Az alkategóriái egy szinttel feljebb kerülnek (a törölt kategória szülője alá), nem vesznek el.
+ *  - Ha tételek tartoznak hozzá, kötelező megmondani, hová kerüljenek:
+ *    moveTo = másik (azonos típusú) kategória id-ja, vagy 'none' = kategória nélkül.
+ *    Enélkül a törlés hibát ad, így véletlenül nem „tűnhet el” a besorolás.
+ *  - A sablonok hivatkozása ugyanígy átkerül (vagy kiürül).
+ */
+export async function deleteCategory(db, id, { moveTo } = {}) {
+  const cur = await loadCategory(db, id);
+  if (cur.is_system) throw bad('A rendszer-kategória nem törölhető');
+  const used = (await db.query('SELECT COUNT(*)::int AS n FROM transactions WHERE category_id = $1', [id])).rows[0].n;
+  let target = null;
+  if (moveTo !== undefined && moveTo !== null && moveTo !== '' && moveTo !== 'none') {
+    target = int(moveTo);
+    if (target === id) throw bad('Válassz másik kategóriát');
+    const t = await loadCategory(db, target);
+    if (t.kind !== cur.kind) throw bad('A tételek csak azonos típusú kategóriába kerülhetnek át');
+  } else if (used > 0 && moveTo !== 'none') {
+    const e = bad(`${used} tétel tartozik ehhez a kategóriához – válaszd ki, hová kerüljenek`);
+    e.status = 409;
+    throw e;
+  }
+  await db.query('UPDATE transactions SET category_id = $1 WHERE category_id = $2', [target, id]);
+  await db.query('UPDATE templates SET category_id = $1 WHERE category_id = $2', [target, id]);
+  await db.query('UPDATE categories SET parent_id = $1 WHERE parent_id = $2', [cur.parent_id, id]);
+  await db.query('DELETE FROM categories WHERE id = $1', [id]);
+  return { moved: used, target };
 }

@@ -73,7 +73,7 @@ export default function TransferSheet({ onClose, from, to, amount: initialAmount
         <WalletPicker value={walletId} onChange={setWalletId} exclude={toWalletId} />
       </Field>
       <div className="xfer-arrow"><ArrowDown size={18} /></div>
-      <Field label="Hová"><WalletPicker value={toWalletId} onChange={setToWalletId} exclude={walletId} /></Field>
+      <Field group label="Hová"><WalletPicker value={toWalletId} onChange={setToWalletId} exclude={walletId} /></Field>
       <Field label="Megjegyzés">
         <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="pl. Heti félretétel nyaralásra" />
       </Field>

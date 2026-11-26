@@ -6,7 +6,10 @@
   "exports": {
     "./parser": "./parser.js",
     "./format": "./format.js",
-    "./text": "./text.js"
+    "./text": "./text.js",
+    "./categories": "./categories.js"
   },
-  "scripts": { "test": "node --test" }
+  "scripts": {
+    "test": "node --test"
+  }
 }

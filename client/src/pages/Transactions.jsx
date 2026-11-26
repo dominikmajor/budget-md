@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, Check, CheckCheck, X, Pencil } from 'lucide-react';
 import { useApp } from '../store.jsx';
 import { api, qs } from '../api.js';
-import { Card, Chip, Empty, Money, Segmented, TagInput } from '../components/ui.jsx';
+import { CategoryPicker, Card, Chip, Empty, Money, Segmented } from '../components/ui.jsx';
 import TxRow from '../components/TxRow.jsx';
 import { dateKey, dayLabel, signedAmount, haptic } from '../lib/util.js';
 import { BP, useMediaQuery } from '../lib/useMediaQuery.js';
@@ -78,7 +78,6 @@ function DraftCard({ tx }) {
   };
   const remove = () => mutate(() => api.del(`/transactions/${tx.id}`), 'Piszkozat törölve');
 
-  const cats = state.categories.filter((c) => c.kind === local.type && !c.archived && !c.isSystem);
   const wallets = state.wallets.filter((w) => !w.archived && w.kind !== 'envelope');
 
   return (
@@ -108,14 +107,9 @@ function DraftCard({ tx }) {
         {local.type !== 'transfer' && (
           <>
             <div className="draft-row-label">Kategória</div>
-            <div className="picker scroll">
-              {cats.map((c) => (
-                <Chip key={c.id} active={local.categoryId === c.id} color={c.color} onClick={() => patch({ categoryId: local.categoryId === c.id ? null : c.id })}>{c.icon} {c.name}</Chip>
-              ))}
-            </div>
+            <CategoryPicker kind={local.type} value={local.categoryId} onChange={(categoryId) => patch({ categoryId })} />
           </>
         )}
-        <TagInput value={local.tags} onChange={(tags) => patch({ tags })} />
       </Card>
     </div>
   );
@@ -137,12 +131,10 @@ function Journal() {
     wallet: params.get('tarca') || '',
     type: params.get('tipus') || '',
     category: params.get('kategoria') || '',
-    project: params.get('projekt') || '',
-    tag: params.get('cimke') || '',
     receipt: params.get('blokk') === '1',
   };
   const setFilter = (key, value) => {
-    const names = { wallet: 'tarca', type: 'tipus', category: 'kategoria', project: 'projekt', tag: 'cimke', receipt: 'blokk' };
+    const names = { wallet: 'tarca', type: 'tipus', category: 'kategoria', receipt: 'blokk' };
     const p = new URLSearchParams(params);
     const current = p.get(names[key]);
     if (!value || String(current) === String(value)) p.delete(names[key]); else p.set(names[key], value);
@@ -199,34 +191,13 @@ function Journal() {
             ))}
             <Chip active={filters.receipt} onClick={() => setFilter('receipt', filters.receipt ? '' : '1')}>📎 Csak blokk fotóval</Chip>
           </div>
-          <div className="filter-label">Kategória</div>
-          <div className="picker scroll">
-            {state.categories.filter((c) => !c.archived).map((c) => (
-              <Chip key={c.id} active={filters.category === String(c.id)} color={c.color} onClick={() => setFilter('category', c.id)}>
-                {c.icon} {c.name}{c.isSystem ? (c.kind === 'income' ? ' +' : ' −') : ''}
-              </Chip>
-            ))}
-          </div>
-          {state.projects.length > 0 && (
-            <>
-              <div className="filter-label">Side-hustle projekt</div>
-              <div className="picker scroll">
-                {state.projects.map((p) => (
-                  <Chip key={p.id} active={filters.project === String(p.id)} color={p.color} onClick={() => setFilter('project', p.id)}>{p.name}</Chip>
-                ))}
-              </div>
-            </>
-          )}
-          {state.tags.length > 0 && (
-            <>
-              <div className="filter-label">Címke</div>
-              <div className="picker scroll">
-                {state.tags.map((t) => (
-                  <Chip key={t.id} active={filters.tag === t.name} onClick={() => setFilter('tag', t.name)}>#{t.name}</Chip>
-                ))}
-              </div>
-            </>
-          )}
+          <div className="filter-label">Kategória <span className="muted small">· az alkategóriák tételeivel együtt</span></div>
+          <CategoryPicker includeSystem value={filters.category ? Number(filters.category) : null}
+            onChange={(id) => {
+              const p = new URLSearchParams(params);
+              if (id == null) p.delete('kategoria'); else p.set('kategoria', id);
+              setParams(p, { replace: true });
+            }} />
           {activeCount > 0 && <button className="link-btn" onClick={() => setParams({}, { replace: true })}>Szűrők törlése</button>}
         </Card>
       )}

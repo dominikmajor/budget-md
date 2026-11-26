@@ -1,4 +1,5 @@
 import { normalize, capitalize } from './text.js';
+import { depthOf, isActive } from './categories.js';
 
 /**
  * Szabadszöveges gyorsbevitel értelmezése.
@@ -11,7 +12,7 @@ import { normalize, capitalize } from './text.js';
  * @param {string} text
  * @param {object} ctx
  * @param {Array<{id:number,name:string,keywords?:string[],archived?:boolean}>} ctx.wallets
- * @param {Array<{id:number,name:string,kind:string,keywords?:string[],archived?:boolean}>} [ctx.categories]
+ * @param {Array<{id:number,name:string,kind:string,parentId?:number|null,keywords?:string[],archived?:boolean}>} [ctx.categories]
  * @param {Record<string, number>} [ctx.memory]  normalizált megnevezés -> kategória id (korábbi használat)
  */
 export function parseQuickEntry(text, { wallets = [], categories = [], memory = {} } = {}) {
@@ -126,7 +127,14 @@ function buildWalletIndex(wallets) {
 export function guessCategory(name, type, { categories = [], memory = {} } = {}) {
   const n = normalize(name);
   if (!n) return null;
-  const pool = categories.filter((c) => !c.archived && c.kind === type);
+  // Archivált kategória (vagy archivált ős alatti) nem jöhet szóba; kulcsszó-egyezésnél
+  // a mélyebb (specifikusabb) alkategória nyer.
+  const byId = Object.fromEntries(categories.map((c) => [c.id, c]));
+  const pool = categories
+    .filter((c) => c.kind === type && !c.isSystem && isActive(c, byId))
+    .map((c) => ({ c, d: depthOf(c.id, byId) }))
+    .sort((a, b) => b.d - a.d)
+    .map((x) => x.c);
   const poolIds = new Set(pool.map((c) => c.id));
 
   if (memory[n] != null && poolIds.has(memory[n])) return memory[n];

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { childrenMap, isActive, pathOf } from '@budget/shared/categories';
 import { useApp } from '../store.jsx';
 import { formatHUF, TYPE_META } from '../lib/util.js';
 
@@ -43,13 +44,15 @@ export function Chip({ active, onClick, children, color, className = '' }) {
   );
 }
 
-export function Field({ label, children, hint }) {
+/** group: gombcsoportot (választót) tartalmazó mező – div, hogy a címkére kattintás ne „nyomja meg” az első gombot */
+export function Field({ label, children, hint, group }) {
+  const Tag = group ? 'div' : 'label';
   return (
-    <label className="field">
+    <Tag className="field" role={group ? 'group' : undefined}>
       <span className="field-label">{label}</span>
       {children}
       {hint && <span className="field-hint">{hint}</span>}
-    </label>
+    </Tag>
   );
 }
 
@@ -84,69 +87,43 @@ export function WalletPicker({ value, onChange, exclude, includeEnvelopes = true
   );
 }
 
-export function CategoryPicker({ kind, value, onChange }) {
-  const { state } = useApp();
-  const list = state.categories.filter((c) => c.kind === kind && !c.archived && !c.isSystem);
+/**
+ * Lépcsőzetes kategóriaválasztó a kategóriafához: felül a főkategóriák, a kiválasztott ág alatt
+ * soronként az alkategóriák (korlátlan mélységig). A kiválasztott chipre újra koppintva egy szinttel feljebb lép.
+ *  - kind: 'expense' | 'income' | undefined (mindkettő)
+ *  - exclude: kizárt id-k (pl. szülőválasztásnál a saját ág)
+ *  - noneLabel: ha meg van adva, egy „semmi” chip is megjelenik (value = null)
+ */
+export function CategoryPicker({ kind, value, onChange, includeSystem = false, exclude, noneLabel }) {
+  const { state, categoriesById } = useApp();
+  const visible = state.categories.filter((c) =>
+    (!kind || c.kind === kind) && (includeSystem || !c.isSystem) && isActive(c, categoriesById));
+  // A kizárt kategóriák a helyükön maradnak a fában (csak nem jelennek meg), így a gyerekeik sem „ugranak” feljebb
+  const all = childrenMap(visible);
+  const kids = new Map([...all].map(([k, list]) => [k, exclude ? list.filter((c) => !exclude.has(c.id)) : list]));
+  const path = value != null && categoriesById[value] ? pathOf(value, categoriesById).map((c) => c.id) : [];
+  const levels = [{ parent: null, items: kids.get('root') || [] }];
+  for (const id of path) {
+    const items = kids.get(id);
+    if (items?.length) levels.push({ parent: id, items });
+  }
+  const pick = (c) => onChange(value === c.id ? (c.parentId ?? null) : c.id);
+  const suffix = (c) => (c.isSystem && !kind ? (c.kind === 'income' ? ' +' : ' −') : '');
   return (
-    <div className="picker">
-      {list.map((c) => (
-        <Chip key={c.id} active={value === c.id} color={c.color} onClick={() => onChange(value === c.id ? null : c.id)}>
-          <span>{c.icon}</span> {c.name}
-        </Chip>
-      ))}
-    </div>
-  );
-}
-
-export function ProjectPicker({ value, onChange }) {
-  const { state } = useApp();
-  const list = state.projects.filter((p) => !p.archived);
-  return (
-    <div className="picker">
-      {list.map((p) => (
-        <Chip key={p.id} active={value === p.id} color={p.color} onClick={() => onChange(value === p.id ? null : p.id)}>
-          {p.name}
-        </Chip>
-      ))}
-    </div>
-  );
-}
-
-export function TagInput({ value = [], onChange }) {
-  const { state } = useApp();
-  const [text, setText] = useState('');
-  const add = (t) => {
-    const n = t.replace(/^#/, '').trim().toLowerCase();
-    if (n && !value.includes(n)) onChange([...value, n]);
-    setText('');
-  };
-  const suggestions = state.tags.map((t) => t.name).filter((t) => !value.includes(t) && (!text || t.includes(text.replace(/^#/, '').toLowerCase()))).slice(0, 8);
-  return (
-    <div className="tags">
-      <div className="picker">
-        {value.map((t) => (
-          <button type="button" key={t} className="chip on tag" onClick={() => onChange(value.filter((x) => x !== t))}>
-            #{t} <X size={14} />
-          </button>
-        ))}
-        <input
-          className="tag-input"
-          placeholder="#új címke"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ' || e.key === ',') { e.preventDefault(); add(text); }
-          }}
-          onBlur={() => text && add(text)}
-        />
-      </div>
-      {suggestions.length > 0 && (
-        <div className="picker muted">
-          {suggestions.map((t) => (
-            <button type="button" key={t} className="chip ghost" onClick={() => add(t)}><Plus size={12} /> #{t}</button>
+    <div className="cat-picker">
+      {levels.map((lvl, i) => (
+        <div key={lvl.parent ?? 'root'} className={`picker ${i ? 'sub' : ''}`}>
+          {i === 0 && noneLabel && <Chip active={value == null} onClick={() => onChange(null)}>{noneLabel}</Chip>}
+          {i > 0 && <span className="sub-label">{categoriesById[lvl.parent]?.name} <ChevronRight size={12} /></span>}
+          {lvl.items.map((c) => (
+            <Chip key={c.id} active={path.includes(c.id)} color={c.color} onClick={() => pick(c)}
+              className={path.includes(c.id) && c.id !== value ? 'ancestor' : ''}>
+              <span>{c.icon}</span> {c.name}{suffix(c)}
+              {kids.get(c.id)?.length ? <ChevronRight size={13} className="chev" /> : null}
+            </Chip>
           ))}
         </div>
-      )}
+      ))}
     </div>
   );
 }
