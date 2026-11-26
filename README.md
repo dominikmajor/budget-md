@@ -30,7 +30,7 @@ utána megadod a kezdőegyenlegeket.
 
 A migrációk az API indulásakor **automatikusan lefutnak** (külön is: `npm run db:migrate`).
 A seed létrehozza az 5 alapértelmezett tárolót (OTP Számla, Revolut, Költős, Irattartó, Nyaralás boríték),
-a kategóriákat (a „Side-hustle” bevételi kategória alatt 3 alkategóriával) és 3 gyorsrögzítő sablont.
+és 3 gyorsrögzítő sablont. Kategóriát nem tölt fel előre: a kategóriafát a Beállításokban építed fel nulláról, minden kategóriának egy általad beírt emoji az ikonja.
 
 ## Ellenőrzés
 
@@ -69,6 +69,7 @@ NODE_ENV=production npm start   # az API kiszolgálja a buildelt frontendet is a
 - Áthelyezés: bármelyik azonos típusú kategória alá (a saját ága alá nem).
 - Törlés: az alkategóriák egy szinttel feljebb lépnek. Ha tételek tartoznak a kategóriához, meg kell adni, hová kerüljenek (másik kategória vagy „Kategória nélkül”) – enélkül a szerver nem engedi a törlést.
 - A 003-as migráció a régi adatokat átalakítja: a projektek a „Side-hustle” kategória alkategóriái lettek (a tételeik oda kerültek), a #címkék a tételek megjegyzésének végére íródtak. Régi JSON mentés visszatöltésekor ugyanez automatikusan megtörténik.
+- A 004-es migráció a korábban előre feltöltött alapkategóriákat törli (a hozzájuk rendelt tételek „Kategória nélkül” maradnak, a saját kategóriák megmaradnak).
 - Az app tisztán nyilvántartó: nincs költési keret. Az egyetlen célszint az Irattartó minimuma (figyelmeztetés a Főoldalon).
 
 ## Pénzügyi logika

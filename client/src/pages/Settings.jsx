@@ -8,7 +8,6 @@ import PinPad from '../components/PinPad.jsx';
 import { AmountInput, Card, Field, Segmented, WalletPicker, CategoryPicker } from '../components/ui.jsx';
 import { formatHUF, downloadUrl } from '../lib/util.js';
 
-const EMOJIS = ['🏷️', '💻', '🎨', '📷', '🧾', '🍝', '🍦', '🧴', '🎓', '🚌', '🎉', '📦', '💼', '🎁', '✨', '☕', '🍺', '🛒', '👕', '💊', '🏋️', '📚', '🎮', '🏠', '📱', '💡', '🐶', '✂️', '🚕'];
 const COLORS = ['#f97316', '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#eab308', '#64748b', '#22c55e', '#f43f5e', '#0ea5e9', '#84cc16', '#a855f7'];
 
 export default function Settings() {
@@ -111,7 +110,7 @@ function CategoryEditor({ item, onClose, onDelete }) {
   const { state, mutate, categoriesById } = useApp();
   const [name, setName] = useState(item.name || '');
   const [parentId, setParentId] = useState(item.parentId ?? null);
-  const [icon, setIcon] = useState(item.icon || EMOJIS[0]);
+  const [icon, setIcon] = useState(item.id ? item.icon : '');
   const [color, setColor] = useState(item.color || COLORS[0]);
   const [keywords, setKeywords] = useState((item.keywords || []).join(', '));
   // A saját ága alá nem mozgatható
@@ -130,12 +129,14 @@ function CategoryEditor({ item, onClose, onDelete }) {
         <Field group label="Hová tartozik" hint="Válaszd a Főkategóriát, vagy bármelyik kategóriát (alkategóriát is), ami alá kerüljön">
           <CategoryPicker kind={item.kind} value={parentId} onChange={setParentId} exclude={exclude} noneLabel="⬆️ Főkategória" />
         </Field>
-        <Field label="Ikon"><div className="icon-grid">{EMOJIS.map((e) => <button type="button" key={e} className={icon === e ? 'on' : ''} onClick={() => setIcon(e)}>{e}</button>)}</div></Field>
+        <Field label="Ikon (emoji)" hint="Írj be egy tetszőleges emojit – mobilon a billentyűzet emoji-gombjával, Macen Ctrl+Cmd+Szóköz, Windowson Win+.">
+          <EmojiInput value={icon} onChange={setIcon} />
+        </Field>
         <Field label="Szín"><div className="color-grid">{COLORS.map((c) => <button type="button" key={c} className={color === c ? 'on' : ''} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />)}</div></Field>
         <Field label="Gyorsbeviteli kulcsszavak" hint="Pl. „lidl, spar” – ezekre a szavakra automatikusan ez a kategória lesz kitöltve">
           <input className="input" value={keywords} onChange={(e) => setKeywords(e.target.value)} />
         </Field>
-        <button className="btn primary full" disabled={!name.trim()} onClick={save}>Mentés</button>
+        <button className="btn primary full" disabled={!name.trim() || !icon} onClick={save}>Mentés</button>
         {item.id && (
           <div className="row gap">
             <button className="btn ghost grow" onClick={async () => {
@@ -147,6 +148,31 @@ function CategoryEditor({ item, onClose, onDelete }) {
         )}
       </div>
     </Sheet>
+  );
+}
+
+const isEmoji = (g) => /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(g);
+const graphemes = (str) => {
+  try { return [...new Intl.Segmenter('hu', { granularity: 'grapheme' }).segment(str)].map((x) => x.segment); } catch { return [...str]; }
+};
+
+/** Egyetlen, szabadon beírt emoji: a beírt szövegből az utolsó emojit tartja meg. */
+function EmojiInput({ value, onChange }) {
+  const [warn, setWarn] = useState(false);
+  const change = (text) => {
+    const emojis = graphemes(text).filter(isEmoji);
+    if (!text) { onChange(''); setWarn(false); return; }
+    if (!emojis.length) { setWarn(true); return; }
+    setWarn(false);
+    onChange(emojis[emojis.length - 1]);
+  };
+  return (
+    <div className="emoji-input">
+      <span className="emoji-preview" aria-hidden="true">{value || '?'}</span>
+      <input className="input" value={value} onChange={(e) => change(e.target.value)} placeholder="pl. 🍕" inputMode="text"
+        autoComplete="off" aria-label="Kategória ikonja (emoji)" />
+      {warn && <span className="field-hint warn">Csak emoji lehet az ikon.</span>}
+    </div>
   );
 }
 

@@ -465,6 +465,13 @@ const nextSort = async (db, parentId, kind) =>
     [parentId, kind],
   )).rows[0].n;
 
+function cleanIcon(v) {
+  const s = String(v ?? '').trim();
+  if (!s) throw bad('Adj meg egy emojit ikonnak');
+  if (s.length > 32) throw bad('Az ikon egyetlen emoji legyen');
+  return s;
+}
+
 function cleanCatKeywords(v) {
   return [...new Set((Array.isArray(v) ? v : String(v || '').split(',')).map((k) => k.trim().toLowerCase()).filter(Boolean))];
 }
@@ -480,7 +487,7 @@ export async function createCategory(db, input) {
   const { rows } = await db.query(
     `INSERT INTO categories (name, kind, icon, color, keywords, parent_id, sort_order)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-    [name, kind, input.icon || parent?.icon || '🏷️', input.color || parent?.color || '#8b8fa3',
+    [name, kind, input.icon ? cleanIcon(input.icon) : (parent?.icon || '🏷️'), input.color || parent?.color || '#8b8fa3',
       cleanCatKeywords(input.keywords), parentId, await nextSort(db, parentId, kind)],
   );
   return rows[0].id;
@@ -496,7 +503,7 @@ export async function updateCategory(db, id, input) {
     if (!name) throw bad('Adj nevet a kategóriának');
     set('name', name);
   }
-  if (input.icon !== undefined) set('icon', String(input.icon));
+  if (input.icon !== undefined) set('icon', cleanIcon(input.icon));
   if (input.color !== undefined) set('color', String(input.color));
   if (input.keywords !== undefined) set('keywords', cleanCatKeywords(input.keywords));
   if (input.archived !== undefined) set('archived', !!input.archived);

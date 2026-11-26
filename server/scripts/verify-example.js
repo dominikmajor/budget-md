@@ -38,6 +38,26 @@ try {
   await db.query(`SET LOCAL search_path TO ${schema}`);
   await runMigrations(db, { log: () => {} });
 
+  // Az alapkategóriák törölve vannak (004) – csak a rejtett rendszer-kategóriák maradnak
+  {
+    const { rows } = await db.query('SELECT name, is_system FROM categories');
+    check('Nincs előre feltöltött kategória (csak a rejtett Egyenleg korrekció)', () =>
+      assert.deepEqual(rows.filter((r) => !r.is_system), []));
+  }
+  // A forgatókönyvhöz szükséges saját kategóriák – ahogy a felhasználó felvenné őket
+  {
+    const mk = (name, kind, keywords, parentId) => F.createCategory(db, { name, kind, keywords, parentId, icon: '🏷️' });
+    await mk('Család / Ajándék', 'income', 'mama, papa');
+    const sh = await mk('Side-hustle', 'income', 'munka');
+    await mk('Side-hustle #1', 'income', '', sh);
+    await mk('Korrepetálás', 'income', 'korrep', sh);
+    await mk('Ösztöndíj', 'income', 'osztondij');
+    await mk('Kaja', 'expense', 'kaja, spar');
+    await mk('Nasi', 'expense', 'fagyi, kave');
+    await mk('Drogéria', 'expense', 'dm, rossmann');
+    await mk('Egyéb kiadás', 'expense', 'egyeb');
+  }
+
   // Kezdőállapot a specifikáció szerint
   const start = { 'OTP Számla': 45000, Revolut: 12000, 'Költős': 3000, 'Irattartó': 30000, 'Nyaralás': 50000 };
   for (const [name, amount] of Object.entries(start)) {
@@ -117,10 +137,9 @@ try {
     const s0 = await state();
     const sub = s0.categories.find((c) => c.name === 'Side-hustle #1');
     const root = s0.categories.find((c) => c.name === 'Side-hustle' && c.kind === 'income');
-    check('A régi projektek a Side-hustle alkategóriái lettek', () => {
+    check('Side-hustle #1 a Side-hustle alkategóriája, bevétel típusú', () => {
       assert.equal(sub?.parentId, root.id);
       assert.equal(sub.kind, 'income');
-      assert.equal(s0.categories.filter((c) => c.parentId === root.id).length, 3);
     });
     await F.createTransaction(db, {
       type: 'income', amount: 16000, walletId: await wid('OTP Számla'), categoryId: sub.id, name: 'Munka',
@@ -291,6 +310,7 @@ try {
     await db.query(`SET LOCAL search_path TO ${legacy}`);
     const dir = new URL('../migrations/', import.meta.url);
     for (const f of ['001_schema.sql', '002_seed.sql']) await db.query(await fs.readFile(new URL(f, dir), 'utf8'));
+    await db.query(`INSERT INTO categories (name, kind, icon) VALUES ('Saját', 'income', '⭐')`);
     const { rows: [tx] } = await db.query(
       `INSERT INTO transactions (type, amount, wallet_id, category_id, project_id, name, note)
        VALUES ('income', 9000, (SELECT id FROM wallets LIMIT 1), (SELECT id FROM categories WHERE name = 'Side-hustle'),
@@ -305,6 +325,20 @@ try {
     check('A projekthez rendelt tétel a Side-hustle › Korrepetálás kategóriába került', () => assert.deepEqual([m.parent, m.name], ['Side-hustle', 'Korrepetálás']));
     check('A címkék a megjegyzés végére kerültek', () => assert.equal(m.note, 'Matek\n#egyetem #matek'));
     check('A projektek és címkék táblái megszűntek', () => assert.deepEqual([gone.rows[0].p, gone.rows[0].t], [null, null]));
+
+    // 004: az alapkategóriák törlése; a saját kategória és a saját alkategória megmarad
+    await db.query(`INSERT INTO categories (name, kind, icon, parent_id)
+                    VALUES ('Saját alkategória', 'expense', '🌟', (SELECT id FROM categories WHERE name = 'Kaja'))`);
+    await db.query(await fs.readFile(new URL('004_remove_default_categories.sql', dir), 'utf8'));
+    const left = (await db.query('SELECT name, parent_id FROM categories WHERE NOT is_system ORDER BY name')).rows;
+    const { rows: [t2] } = await db.query('SELECT category_id FROM transactions WHERE id = $1', [tx.id]);
+    const tpl = (await db.query('SELECT COUNT(*)::int AS n FROM templates WHERE category_id IS NOT NULL')).rows[0].n;
+    check('Migráció: csak a felhasználó saját kategóriái maradnak, a saját alkategória főkategória lett', () =>
+      assert.deepEqual(left, [{ name: 'Saját', parent_id: null }, { name: 'Saját alkategória', parent_id: null }]));
+    check('Migráció: az alapkategóriás tétel és a sablonok kategória nélkül maradtak', () => {
+      assert.equal(t2.category_id, null);
+      assert.equal(tpl, 0);
+    });
   }
 
   await db.query('ROLLBACK');

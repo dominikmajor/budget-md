@@ -108,6 +108,9 @@ export function CategoryPicker({ kind, value, onChange, includeSystem = false, e
     if (items?.length) levels.push({ parent: id, items });
   }
   const pick = (c) => onChange(value === c.id ? (c.parentId ?? null) : c.id);
+  if (!levels[0].items.length && !noneLabel) {
+    return <p className="muted small">Még nincs kategória – a Beállítások → Kategóriák kezelése menüben hozhatsz létre.</p>;
+  }
   const suffix = (c) => (c.isSystem && !kind ? (c.kind === 'income' ? ' +' : ' −') : '');
   return (
     <div className="cat-picker">
