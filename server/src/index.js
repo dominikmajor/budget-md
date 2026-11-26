@@ -13,6 +13,30 @@ app.disable('x-powered-by');
 app.use(express.json({ limit: '12mb' }));
 app.use(cookieParser());
 
+// A hiányzó migrációk automatikusan lefutnak (helyben indításkor, Vercelen az első kéréskor)
+let migrated;
+function migrateOnce() {
+  migrated ??= (async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(424242)');
+      await runMigrations(client, { log: (m) => console.log('[migráció]', m.trim()) });
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  })().catch((e) => {
+    migrated = undefined; // következő kérésnél újrapróbálja
+    throw e;
+  });
+  return migrated;
+}
+app.use((req, res, next) => migrateOnce().then(() => next(), next));
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api', requireAuth, apiRoutes);
@@ -32,23 +56,16 @@ app.use((err, req, res, _next) => {
   res.status(status).json({ error: message });
 });
 
-// Indításkor automatikusan lefuttatja a hiányzó migrációkat
-const client = await pool.connect().catch((e) => {
-  console.error('❌ Nem sikerült csatlakozni az adatbázishoz:', e.message);
-  process.exit(1);
-});
-try {
-  await client.query('BEGIN');
-  await client.query('SELECT pg_advisory_xact_lock(424242)');
-  await runMigrations(client, { log: (m) => console.log('[migráció]', m.trim()) });
-  await client.query('COMMIT');
-} catch (e) {
-  await client.query('ROLLBACK');
-  console.error('❌ Migráció hiba:', e.message);
-  process.exit(1);
-} finally {
-  client.release();
-}
+// Vercelen (serverless) az app exportálva van, a platform hívja meg; helyben/szerveren saját maga indul.
+export default app;
 
-const port = Number(process.env.PORT) || 4000;
-app.listen(port, () => console.log(`✅ Budget API fut: http://localhost:${port}`));
+if (!process.env.VERCEL) {
+  try {
+    await migrateOnce();
+  } catch (e) {
+    console.error('❌ Migráció hiba:', e.message);
+    process.exit(1);
+  }
+  const port = Number(process.env.PORT) || 4000;
+  app.listen(port, () => console.log(`✅ Budget API fut: http://localhost:${port}`));
+}

@@ -2,7 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
+// new URL(..., import.meta.url) alakban, hogy a Vercel bundler az SQL fájlokat is becsomagolja
+const dir = fileURLToPath(new URL('../migrations/', import.meta.url));
 
 /** Lefuttatja a még nem alkalmazott SQL migrációkat a megadott kliensen. */
 export async function runMigrations(db, { log = console.log } = {}) {
