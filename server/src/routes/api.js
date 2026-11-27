@@ -48,6 +48,10 @@ r.put('/wallets/:id', async (req, res) => {
   await F.updateWallet(pool, id(req), req.body || {});
   res.json({ ok: true });
 });
+r.delete('/wallets/:id', async (req, res) => {
+  const q = { ...(req.body || {}), ...req.query };
+  res.json(await withTx((db) => F.deleteWallet(db, id(req), { mode: q.mode, moveTo: q.moveTo })));
+});
 r.post('/wallets/:id/reconcile', async (req, res) => {
   res.json(await withTx((db) => F.reconcileWallet(db, id(req), req.body?.actual)));
 });

@@ -44,7 +44,8 @@ export async function getWallets(db) {
   const { rows } = await db.query(
     `SELECT w.*, b.balance,
        COALESCE(m.month_in, 0)  AS month_in,
-       COALESCE(m.month_out, 0) AS month_out
+       COALESCE(m.month_out, 0) AS month_out,
+       (SELECT COUNT(*)::int FROM transactions t WHERE t.wallet_id = w.id OR t.to_wallet_id = w.id) AS tx_count
      FROM wallets w
      JOIN wallet_balances b ON b.wallet_id = w.id
      LEFT JOIN LATERAL (
@@ -80,6 +81,7 @@ function toWallet(r) {
     balance: r.balance,
     monthIn: r.month_in,
     monthOut: r.month_out,
+    txCount: r.tx_count,
     liquid: LIQUID.has(r.kind),
   };
 }
@@ -151,6 +153,44 @@ export async function updateWallet(db, id, input) {
   vals.push(id);
   const r = await db.query(`UPDATE wallets SET ${sets.join(', ')} WHERE id = $${vals.length}`, vals);
   if (!r.rowCount) throw notFound('A tárca nem található');
+}
+
+/**
+ * Tárca / boríték / széf végleges törlése.
+ *  - nincs tétele: egyszerűen törlődik
+ *  - mode = 'move', moveTo = másik tárca: összevonás – a tételei és a kezdőegyenlege átkerül oda,
+ *    a kettejük közötti átcsoportosítások (amik önmagába mutatnának) törlődnek; a teljes vagyon nem változik
+ *  - mode = 'delete': a tárcát érintő összes tétel is törlődik (a másik oldali tárcák egyenlege is változik)
+ */
+export async function deleteWallet(db, id, { mode, moveTo } = {}) {
+  const { rows: [w] } = await db.query('SELECT id, initial_balance FROM wallets WHERE id = $1', [id]);
+  if (!w) throw notFound('A tárca nem található');
+  const used = (await db.query('SELECT COUNT(*)::int AS n FROM transactions WHERE wallet_id = $1 OR to_wallet_id = $1', [id])).rows[0].n;
+  if (mode === 'move') {
+    const target = int(moveTo);
+    if (!target || target === id) throw bad('Válassz másik tárcát, ahová a tételek kerüljenek');
+    const t = await db.query('SELECT id FROM wallets WHERE id = $1', [target]);
+    if (!t.rowCount) throw notFound('A cél tárca nem található');
+    const { rowCount: dropped } = await db.query(
+      `DELETE FROM transactions WHERE (wallet_id = $1 AND to_wallet_id = $2) OR (wallet_id = $2 AND to_wallet_id = $1)`, [id, target]);
+    await db.query('UPDATE transactions SET wallet_id = $2 WHERE wallet_id = $1', [id, target]);
+    await db.query('UPDATE transactions SET to_wallet_id = $2 WHERE to_wallet_id = $1', [id, target]);
+    await db.query('UPDATE wallets SET initial_balance = initial_balance + $2 WHERE id = $1', [target, w.initial_balance]);
+    await db.query('DELETE FROM wallets WHERE id = $1', [id]);
+    return { moved: used - dropped, dropped, target };
+  }
+  if (mode === 'delete') {
+    const { rowCount } = await db.query('DELETE FROM transactions WHERE wallet_id = $1 OR to_wallet_id = $1', [id]);
+    await db.query('DELETE FROM wallets WHERE id = $1', [id]);
+    return { deleted: rowCount };
+  }
+  if (used > 0) {
+    const e = bad(`${used} tétel tartozik ehhez a tárcához – válaszd ki, mi legyen velük`);
+    e.status = 409;
+    throw e;
+  }
+  await db.query('DELETE FROM wallets WHERE id = $1', [id]);
+  return { deleted: 0 };
 }
 
 function defaultIcon(kind) {

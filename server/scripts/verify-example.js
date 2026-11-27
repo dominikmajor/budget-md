@@ -341,6 +341,50 @@ try {
     }
   }
 
+  console.log('\nTárca törlése');
+  {
+    // Összevonás: új tárca kezdőegyenleggel, egy kiadással és egy Revolut-ból jövő átcsoportosítással
+    const tmp = await F.createWallet(db, { name: 'Ideiglenes', kind: 'account', initialBalance: 5000 });
+    const rev = await wid('Revolut');
+    await F.createTransaction(db, { type: 'expense', amount: 1000, walletId: tmp, name: 'Teszt' });
+    await F.createTransaction(db, { type: 'transfer', amount: 2000, walletId: rev, toWalletId: tmp, name: 'Át' });
+    let s = await state();
+    const revBefore = s.wallets.find((w) => w.id === rev).balance;
+    const tmpBal = s.wallets.find((w) => w.id === tmp).balance;
+    const total0 = s.summary.total;
+    check('A tárca tételszáma látszik (2)', () => assert.equal(s.wallets.find((w) => w.id === tmp).txCount, 2));
+    await db.query('SAVEPOINT wd');
+    try {
+      await F.deleteWallet(db, tmp);
+      failures++; console.log('  ❌ Tételes tárca nem törölhető választás nélkül\n     nem dobott hibát');
+    } catch (e) {
+      await db.query('ROLLBACK TO SAVEPOINT wd');
+      check('Tételes tárca nem törölhető választás nélkül', () => assert.match(e.message, /tétel tartozik/));
+    }
+    const r = await F.deleteWallet(db, tmp, { mode: 'move', moveTo: rev });
+    s = await state();
+    check('Összevonás: a tételek és a kezdőegyenleg átkerül, a köztük lévő átcsoportosítás törlődik, a teljes vagyon nem változik', () => {
+      assert.equal(s.wallets.some((w) => w.id === tmp), false);
+      assert.deepEqual([r.moved, r.dropped], [1, 1]);
+      assert.equal(s.wallets.find((w) => w.id === rev).balance, revBefore + tmpBal);
+      assert.equal(s.summary.total, total0);
+    });
+    // Törlés tételekkel együtt
+    const tmp2 = await F.createWallet(db, { name: 'Ideiglenes 2', kind: 'envelope' });
+    await F.createTransaction(db, { type: 'transfer', amount: 3000, walletId: rev, toWalletId: tmp2, name: 'Félre' });
+    const revMid = (await state()).wallets.find((w) => w.id === rev).balance;
+    const r2 = await F.deleteWallet(db, tmp2, { mode: 'delete' });
+    s = await state();
+    check('Törlés tételekkel együtt: a tétel eltűnik, a Revolut visszakapja a 3 000 Ft-ot', () => {
+      assert.equal(r2.deleted, 1);
+      assert.equal(s.wallets.find((w) => w.id === rev).balance, revMid + 3000);
+    });
+    const tmp3 = await F.createWallet(db, { name: 'Üres', kind: 'vault' });
+    await F.deleteWallet(db, tmp3);
+    const gone = !(await state()).wallets.some((w) => w.id === tmp3);
+    check('Üres széf választás nélkül is törölhető', () => assert.equal(gone, true));
+  }
+
   console.log('\nMentés és visszatöltés');
   {
     const before = await state();

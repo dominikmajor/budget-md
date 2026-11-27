@@ -7,7 +7,7 @@ import { BrandMark, Wordmark } from './Brand.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import TransferSheet from './TransferSheet.jsx';
 import TxDetail from './TxDetail.jsx';
-import WalletSheet, { ReconcileSheet } from './WalletSheet.jsx';
+import WalletSheet, { ReconcileSheet, WalletDeleteSheet } from './WalletSheet.jsx';
 
 const TITLES = {
   '/': 'Főoldal',
@@ -129,6 +129,7 @@ function SheetHost() {
     case 'tx': return <TxDetail {...p} />;
     case 'wallet': return <WalletSheet {...p} />;
     case 'reconcile': return <ReconcileSheet {...p} />;
+    case 'walletDelete': return <WalletDeleteSheet {...p} />;
     default: return null;
   }
 }

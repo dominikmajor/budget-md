@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Archive, ArchiveRestore, Scale } from 'lucide-react';
+import { Archive, ArchiveRestore, Scale, Trash2 } from 'lucide-react';
 import Sheet from './Sheet.jsx';
-import { AmountInput, Field, IconColorPicker, Segmented } from './ui.jsx';
+import { AmountInput, Chip, Field, IconColorPicker, Segmented } from './ui.jsx';
 import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import { formatHUF, WALLET_KIND, isGoalKind, isLiquidKind } from '../lib/util.js';
@@ -82,11 +82,74 @@ export default function WalletSheet({ onClose, id, kind: initialKind = 'account'
             <button type="button" className="btn ghost small" onClick={toggleArchive}>
               {existing.archived ? <><ArchiveRestore size={16} /> Visszaállítás</> : <><Archive size={16} /> Archiválás</>}
             </button>
+            <button type="button" className="btn ghost small danger-text" onClick={() => openSheet('walletDelete', { id })}>
+              <Trash2 size={16} /> Törlés
+            </button>
           </div>
         )}
         <p className="muted small">{WALLET_KIND[kind]}{isLiquidKind(kind) ? ' · beleszámít az azonnal elkölthető egyenlegbe' : ' · félretett pénz, nem számít a likvid egyenlegbe'}</p>
         <div className="form-actions sticky">
           <button className="btn primary grow" disabled={!name.trim() || !icon || busy} onClick={save}>Mentés</button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Végleges törlés megerősítéssel; ha vannak tételei, át lehet tenni őket egy másik tárcába, vagy velük együtt törölni. */
+export function WalletDeleteSheet({ onClose, id }) {
+  const { state, walletsById, mutate } = useApp();
+  const w = walletsById[id];
+  const others = state.wallets.filter((x) => x.id !== id && !x.archived);
+  const [mode, setMode] = useState('move');
+  const [target, setTarget] = useState(null);
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!w) return null;
+  const hasTx = w.txCount > 0;
+  const noun = w.kind === 'vault' ? 'széf' : w.kind === 'envelope' ? 'boríték' : 'tárca';
+  const ready = !hasTx || (mode === 'move' ? !!target : confirm);
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      const q = !hasTx ? '' : mode === 'move' ? `?mode=move&moveTo=${target}` : '?mode=delete';
+      await mutate(() => api.del(`/wallets/${id}${q}`), `${noun[0].toUpperCase()}${noun.slice(1)} törölve`);
+      onClose();
+    } catch { /* toast */ } finally { setBusy(false); }
+  };
+
+  return (
+    <Sheet title={`„${w.name}” törlése`} onClose={onClose} tall>
+      <div className="form">
+        <p className="muted">A törlés végleges, nem vonható vissza. Ha csak elrejtenéd, használd inkább az archiválást.</p>
+        {hasTx ? (
+          <>
+            <Field group label={`${w.txCount} tétel tartozik ide (egyenleg: ${formatHUF(w.balance)}) – mi legyen velük?`}>
+              <Segmented small value={mode} onChange={setMode}
+                options={[{ value: 'move', label: 'Áthelyezés' }, { value: 'delete', label: 'Törlés velük együtt' }]} />
+            </Field>
+            {mode === 'move' ? (
+              <Field group label="Melyik tárcába kerüljenek?" hint="A tételek és a kezdőegyenleg átkerül, így az egyenleg megmarad. A két tárca közötti átcsoportosítások törlődnek.">
+                <div className="picker">
+                  {others.map((x) => (
+                    <Chip key={x.id} active={target === x.id} color={x.color} onClick={() => setTarget(x.id)}>
+                      <span>{x.icon}</span> {x.name}
+                    </Chip>
+                  ))}
+                </div>
+              </Field>
+            ) : (
+              <label className="switch-row">
+                <span>Értem: a(z) {w.txCount} tétel is törlődik, és a velük érintett más tárcák egyenlege is változik</span>
+                <input type="checkbox" className="switch" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />
+              </label>
+            )}
+          </>
+        ) : <p className="muted">Ehhez a {{ tárca: 'tárcához', boríték: 'borítékhoz', széf: 'széfhez' }[noun]} nem tartozik tétel.</p>}
+        <div className="row gap">
+          <button className="btn ghost" onClick={onClose}>Mégse</button>
+          <button className="btn danger grow" disabled={busy || !ready} onClick={remove}><Trash2 size={16} /> Végleges törlés</button>
         </div>
       </div>
     </Sheet>
