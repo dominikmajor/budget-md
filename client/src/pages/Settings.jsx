@@ -95,7 +95,7 @@ function CategoriesSheet({ onClose }) {
         })}
         {!rows.length && <p className="muted">Még nincs kategória.</p>}
       </div>
-      <button className="btn ghost full" onClick={() => setEditing({ kind, parentId: null })}><Plus size={16} /> Új főkategória</button>
+      <button className="btn ghost full add-row" onClick={() => setEditing({ kind, parentId: null })}><Plus size={16} /> Új főkategória</button>
       {editing && <CategoryEditor item={editing} onClose={() => setEditing(null)}
         onDelete={() => { setDeleting(editing); setEditing(null); }} />}
       {deleting && <CategoryDelete item={deleting} onClose={() => setDeleting(null)} />}
