@@ -82,8 +82,8 @@ export default function TxForm({ initial = {}, onSubmit, submitLabel = 'Mentés'
       </Field>
 
       {type !== 'transfer' && (
-        <Field group label="Kategória" hint="Az alkategóriák a főkategória kiválasztása után jelennek meg">
-          <CategoryPicker kind={type} value={categoryId} onChange={setCategoryId} />
+        <Field group label="Kategória" hint="Ritka, egyszeri tételnél (pl. kormányablak) hagyhatod kategória nélkül. Az alkategóriák a főkategória kiválasztása után jelennek meg.">
+          <CategoryPicker kind={type} value={categoryId} onChange={setCategoryId} noneLabel="Kategória nélkül" />
         </Field>
       )}
 

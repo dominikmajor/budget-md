@@ -78,7 +78,7 @@ export default function QuickAdd({ onClose, mode: initialMode = 'text', initial 
             </div>
             <div className="preview-meta">
               <span>Tárca: {w ? `${w.icon} ${w.name}` : <em>nincs megadva</em>}</span>
-              <span>Kategória: {cat ? `${cat.icon} ${categoryLabel(cat.id)}` : <em>—</em>}</span>
+              <span>Kategória: {cat ? `${cat.icon} ${categoryLabel(cat.id)}` : <em>nincs (kategória nélkül menti)</em>}</span>
             </div>
           </div>
         )}

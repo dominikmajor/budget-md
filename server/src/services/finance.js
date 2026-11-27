@@ -389,7 +389,9 @@ export async function listTransactions(db, f = {}) {
   else if (f.wallet) add('(t.wallet_id = ? OR t.to_wallet_id = ?)', int(f.wallet));
   if (f.type) add('t.type = ?', f.type);
   // A kategória-szűrő az összes alkategóriát is tartalmazza
-  if (f.category) {
+  // 'none' = kategória nélküli bevételek/kiadások (az átcsoportosításnak sosincs kategóriája)
+  if (f.category === 'none') where.push(`t.category_id IS NULL AND t.type <> 'transfer'`);
+  else if (f.category) {
     add(`t.category_id IN (
       WITH RECURSIVE sub AS (
         SELECT id FROM categories WHERE id = ?

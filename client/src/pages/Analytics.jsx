@@ -203,6 +203,7 @@ function CategoryBreakdown({ type, stats, donut, children }) {
 
   const open = (x) => {
     if (x.drill) setFocus(x.id);
+    else if (x.key === 'none') navigate(`/tranzakciok?kategoria=none&tipus=${type}`);
     else if (x.id != null) navigate(`/tranzakciok?kategoria=${x.id}`);
   };
 
@@ -246,7 +247,7 @@ function CategoryBreakdown({ type, stats, donut, children }) {
       <div className="rank">
         {items.map((x) => {
           const change = x.previous ? (x.amount - x.previous) / x.previous : null;
-          const clickable = x.drill || (x.id != null);
+          const clickable = x.drill || x.id != null || x.key === 'none';
           return (
             <button key={x.key} type="button" className={`rank-row ${clickable ? 'clickable' : ''}`} onClick={() => open(x)} disabled={!clickable}>
               <span className="rank-icon" style={{ '--c': x.color }}>{x.icon}</span>

@@ -225,6 +225,23 @@ try {
     });
   }
 
+  console.log('\nKategória nélküli kiadás (pl. kormányablak)');
+  {
+    const p = parseQuickEntry('kormányablak 6000 otp', await ctx());
+    check('Gyorsbevitel: kategória nélkül is menthető', () => { assert.equal(p.categoryId, null); assert.equal(p.valid, true); });
+    const before = await getStats(db, today());
+    const id = await F.createTransaction(db, p);
+    const st = await getStats(db, today());
+    const none = (x) => x.categoryTotals.find((r) => r.id == null && r.type === 'expense')?.amount || 0;
+    check('Statisztika: „Kategória nélkül” sorban +6 000 Ft', () => assert.equal(none(st) - none(before), 6000));
+    const list = await F.listTransactions(db, { category: 'none' });
+    check('Szűrő „Kategória nélkül”: a tétel benne van, átcsoportosítás nincs', () => {
+      assert.ok(list.some((t) => t.id === id));
+      assert.ok(list.every((t) => t.type !== 'transfer' && t.categoryId == null));
+    });
+    await F.deleteTransaction(db, id);
+  }
+
   console.log('\nKategóriafa: létrehozás, mozgatás, törlés');
   {
     const sp = async (name) => { await db.query(`SAVEPOINT ${name}`); };

@@ -107,7 +107,7 @@ function DraftCard({ tx }) {
         {local.type !== 'transfer' && (
           <>
             <div className="draft-row-label">Kategória</div>
-            <CategoryPicker kind={local.type} value={local.categoryId} onChange={(categoryId) => patch({ categoryId })} />
+            <CategoryPicker kind={local.type} value={local.categoryId} onChange={(categoryId) => patch({ categoryId })} noneLabel="Kategória nélkül" />
           </>
         )}
       </Card>
@@ -194,7 +194,10 @@ function Journal() {
             <Chip active={filters.receipt} onClick={() => setFilter('receipt', filters.receipt ? '' : '1')}>📎 Csak blokk fotóval</Chip>
           </div>
           <div className="filter-label">Kategória <span className="muted small">· az alkategóriák tételeivel együtt</span></div>
-          <CategoryPicker includeSystem value={filters.category ? Number(filters.category) : null}
+          <div className="picker">
+            <Chip active={filters.category === 'none'} onClick={() => setFilter('category', 'none')}>❔ Kategória nélkül</Chip>
+          </div>
+          <CategoryPicker includeSystem value={filters.category && filters.category !== 'none' ? Number(filters.category) : null}
             onChange={(id) => {
               const p = new URLSearchParams(params);
               if (id == null) p.delete('kategoria'); else p.set('kategoria', id);
